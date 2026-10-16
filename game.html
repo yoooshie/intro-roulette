@@ -308,12 +308,15 @@
   .avatars { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; width: 100%; }
   .avatar-btn {
     aspect-ratio: 1;
+    padding: 8%;
     border-radius: 18px;
     border: 3px solid var(--line);
     background: var(--white);
-    font-size: clamp(2rem, 9vw, 2.8rem);
-    line-height: 1;
+    transition: transform 150ms ease-out;
   }
+  .avatar-btn svg { display: block; width: 100%; height: 100%; }
+  .ava { display: inline-block; flex: none; width: 1em; height: 1em; }
+  .ava svg { display: block; width: 100%; height: 100%; }
   .avatar-btn[aria-pressed="true"] { border-color: var(--ink); background: var(--pink-soft); transform: scale(1.05); }
   .me { display: flex; flex-direction: column; align-items: center; gap: 6px; }
   .me .ava { font-size: 4.5rem; line-height: 1; }
@@ -490,7 +493,6 @@
   var TOPIC_ROOT = 'fidia-intro-quiz/v1/';
   var QUIZ_KEY = 'intro-quiz-v1';      // written by the quiz maker on this same site
   var HOST_KEY = 'intro-quiz-host-v1';
-  var AVATARS = ['🐶', '🐱', '🐰', '🐻', '🐼', '🐨', '🐯', '🦁', '🐸', '🐵', '🐧', '🐥', '🦊', '🐹', '🐮', '🐷'];
   var LIMITS = [10, 20, 30];
   var CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
   var SHAPES = [
@@ -530,6 +532,121 @@
     if (text !== undefined) e.textContent = text;
     return e;
   }
+  // Original animal icons: one round face style, dot eyes, company-pink cheeks.
+  var INK = '#3c3a39';
+  function svgWrap(bg, inner) {
+    return '<svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="50" fill="' + bg + '"/>' + inner + '</svg>';
+  }
+  function both(part) { return part + '<g transform="matrix(-1 0 0 1 100 0)">' + part + '</g>'; }
+  function eyes(y, dx, r) {
+    r = r || 4.5;
+    return [-1, 1].map(function (side) {
+      var x = 50 + side * dx;
+      return '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" fill="' + INK + '"/>' +
+        '<circle cx="' + (x + 1.4) + '" cy="' + (y - 1.6) + '" r="1.4" fill="#fff"/>';
+    }).join('');
+  }
+  function cheeks(y, dx, color) {
+    return both('<ellipse cx="' + (50 - dx) + '" cy="' + y + '" rx="6" ry="3.8" fill="' + (color || '#e3aaaa') + '"/>');
+  }
+  function smile(y, w) {
+    w = w || 4;
+    return '<path d="M' + (50 - w) + ' ' + y + ' Q50 ' + (y + 5) + ' ' + (50 + w) + ' ' + y + '" fill="none" stroke="' + INK + '" stroke-width="2.6" stroke-linecap="round"/>';
+  }
+  function nose(y, rx, ry) { return '<ellipse cx="50" cy="' + y + '" rx="' + (rx || 4.5) + '" ry="' + (ry || 3.4) + '" fill="' + INK + '"/>'; }
+  var OUTLINE = ' stroke="#e6dddc" stroke-width="2"';
+
+  var AVATARS = [
+    ['いぬ', svgWrap('#fbe9d7',
+      both('<ellipse cx="25" cy="50" rx="10" ry="18" fill="#a8754f" transform="rotate(18 25 50)"/>') +
+      '<circle cx="50" cy="54" r="28" fill="#e8b98a"/><ellipse cx="50" cy="66" rx="13" ry="10" fill="#fff4e8"/>' +
+      eyes(50, 11) + nose(61) + smile(66, 3.5) + cheeks(61, 20))],
+    ['ねこ', svgWrap('#f4dede',
+      both('<path d="M24 42 L28 16 L45 32Z" fill="#aaa39f"/><path d="M29 35 L30 23 L39 31Z" fill="#f2b8b8"/>') +
+      '<circle cx="50" cy="56" r="28" fill="#c9c3bf"/>' + eyes(53, 11) +
+      '<path d="M47 60 L53 60 L50 63.5Z" fill="#e58f8f"/>' +
+      '<path d="M44 65 Q47 68 50 65 Q53 68 56 65" fill="none" stroke="' + INK + '" stroke-width="2.2" stroke-linecap="round"/>' +
+      both('<path d="M19 59 L33 61 M19 66 L33 65" stroke="' + INK + '" stroke-width="1.6" stroke-linecap="round"/>') +
+      cheeks(64, 20))],
+    ['うさぎ', svgWrap('#e3eef9',
+      both('<ellipse cx="38" cy="27" rx="8" ry="20" fill="#fff"' + OUTLINE + '/><ellipse cx="38" cy="28" rx="3.5" ry="14" fill="#f2b8b8"/>') +
+      '<circle cx="50" cy="61" r="26" fill="#fff"' + OUTLINE + '/>' + eyes(58, 10) +
+      '<ellipse cx="50" cy="65" rx="3" ry="2.2" fill="#e58f8f"/>' + smile(68, 3) + cheeks(66, 17))],
+    ['くま', svgWrap('#f6eadf',
+      both('<circle cx="28" cy="32" r="11" fill="#8b5e3c"/><circle cx="28" cy="32" r="5" fill="#d9a98a"/>') +
+      '<circle cx="50" cy="55" r="28" fill="#a8744d"/><ellipse cx="50" cy="65" rx="12" ry="9" fill="#e8cfb0"/>' +
+      eyes(51, 11) + nose(61) + smile(66, 3.5) + cheeks(60, 21))],
+    ['パンダ', svgWrap('#e5f2e6',
+      both('<circle cx="29" cy="32" r="10" fill="' + INK + '"/>') +
+      '<circle cx="50" cy="55" r="28" fill="#fff"' + OUTLINE + '/>' +
+      both('<ellipse cx="38" cy="53" rx="7" ry="9.5" fill="' + INK + '" transform="rotate(-25 38 53)"/><circle cx="38.5" cy="52" r="2.6" fill="#fff"/>') +
+      nose(62, 4, 3) + smile(66, 3.5) + cheeks(62, 21))],
+    ['コアラ', svgWrap('#e5edf3',
+      both('<circle cx="24" cy="40" r="15" fill="#9aa5ad"/><circle cx="24" cy="40" r="8" fill="#e3e8ec"/>') +
+      '<circle cx="50" cy="56" r="27" fill="#b9c2c8"/>' + eyes(52, 13, 4) +
+      '<ellipse cx="50" cy="61" rx="6" ry="8" fill="' + INK + '"/>' + smile(72, 3) + cheeks(65, 20))],
+    ['とら', svgWrap('#fff1d1',
+      both('<circle cx="29" cy="32" r="9" fill="#f0a040"/><circle cx="29" cy="32" r="4.5" fill="#fff1d9"/>') +
+      '<circle cx="50" cy="55" r="28" fill="#f0a040"/>' +
+      '<path d="M43 30 L50 37 L57 30" fill="none" stroke="' + INK + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>' +
+      both('<path d="M23 51 L32 53 M23 59 L31 59" stroke="' + INK + '" stroke-width="3" stroke-linecap="round"/>') +
+      '<ellipse cx="50" cy="66" rx="13" ry="9" fill="#fff8ec"/>' + eyes(50, 11) + nose(61) + smile(66, 3.5))],
+    ['ライオン', svgWrap('#fff0d6',
+      (function () {
+        var m = '';
+        for (var k = 0; k < 12; k++) {
+          var a = k / 12 * Math.PI * 2;
+          m += '<circle cx="' + (50 + Math.cos(a) * 31).toFixed(1) + '" cy="' + (53 + Math.sin(a) * 31).toFixed(1) + '" r="11" fill="#c9822e"/>';
+        }
+        return m;
+      })() +
+      '<circle cx="50" cy="53" r="31" fill="#c9822e"/><circle cx="50" cy="55" r="24" fill="#f2c46b"/>' +
+      '<ellipse cx="50" cy="64" rx="10" ry="7" fill="#fff3dc"/>' + eyes(51, 10) + nose(61, 4, 3) + smile(65, 3) + cheeks(60, 17))],
+    ['かえる', svgWrap('#e0f2dc',
+      both('<circle cx="32" cy="38" r="11" fill="#7cc576"/>') +
+      '<ellipse cx="50" cy="61" rx="34" ry="24" fill="#7cc576"/>' +
+      both('<circle cx="32" cy="38" r="7.5" fill="#fff"/><circle cx="33" cy="39" r="3.6" fill="' + INK + '"/>') +
+      '<path d="M35 64 Q50 76 65 64" fill="none" stroke="' + INK + '" stroke-width="2.8" stroke-linecap="round"/>' + cheeks(64, 26))],
+    ['さる', svgWrap('#f6e6d8',
+      both('<circle cx="21" cy="53" r="10" fill="#b07a4f"/><circle cx="21" cy="53" r="5" fill="#f1d2b4"/>') +
+      '<circle cx="50" cy="53" r="28" fill="#b07a4f"/>' +
+      '<path d="M50 41 C40 31 26 41 32 57 C34 71 44 77 50 77 C56 77 66 71 68 57 C74 41 60 31 50 41Z" fill="#f1d2b4"/>' +
+      eyes(53, 9) + '<circle cx="47" cy="62" r="1.5" fill="' + INK + '"/><circle cx="53" cy="62" r="1.5" fill="' + INK + '"/>' +
+      smile(67, 5) + cheeks(65, 15))],
+    ['ペンギン', svgWrap('#dfecf7',
+      '<circle cx="50" cy="54" r="30" fill="#3f4a5a"/>' +
+      '<path d="M50 41 C38 31 24 45 30 61 C34 75 44 80 50 80 C56 80 66 75 70 61 C76 45 62 31 50 41Z" fill="#fff"/>' +
+      eyes(53, 9) + '<path d="M43 61 L57 61 L50 69Z" fill="#f5a623"/>' + cheeks(65, 17))],
+    ['ひよこ', svgWrap('#fff4c2',
+      '<path d="M45 28 Q46 15 51 22 Q55 13 56 28Z" fill="#ffd84d"/>' +
+      '<circle cx="50" cy="57" r="30" fill="#ffd84d"/>' + eyes(53, 11) +
+      '<path d="M44 61 L56 61 L50 68Z" fill="#f59f2a"/>' + cheeks(64, 20))],
+    ['きつね', svgWrap('#fde3d1',
+      both('<path d="M20 46 L25 14 L46 31Z" fill="#e98a4a"/><path d="M26 38 L28 23 L38 31Z" fill="#7a4a2a"/>') +
+      '<path d="M17 46 Q50 18 83 46 Q77 75 50 83 Q23 75 17 46Z" fill="#e98a4a"/>' +
+      '<path d="M25 58 Q50 53 75 58 Q67 79 50 83 Q33 79 25 58Z" fill="#fff6ee"/>' +
+      eyes(51, 12) + nose(70, 4, 3) + cheeks(62, 22))],
+    ['ハムスター', svgWrap('#fbece0',
+      both('<circle cx="29" cy="31" r="9" fill="#e8b07c"/><circle cx="29" cy="31" r="4.5" fill="#f6c9c9"/>') +
+      '<ellipse cx="50" cy="57" rx="32" ry="28" fill="#f0c18f"/><ellipse cx="50" cy="67" rx="20" ry="14" fill="#fff6ee"/>' +
+      eyes(52, 13, 4) + '<circle cx="50" cy="62" r="2.6" fill="#e58f8f"/>' + smile(66, 3) + cheeks(63, 23))],
+    ['うし', svgWrap('#ecf1e3',
+      both('<path d="M30 33 Q20 24 23 15 Q31 23 38 28Z" fill="#e9dcc3"/><ellipse cx="21" cy="45" rx="9" ry="5" fill="#fff"' + OUTLINE + '/>') +
+      '<circle cx="50" cy="53" r="27" fill="#fff"' + OUTLINE + '/>' +
+      '<path d="M58 29 Q72 29 73 42 Q65 47 58 40Z" fill="' + INK + '"/>' +
+      eyes(50, 10) + '<ellipse cx="50" cy="68" rx="16" ry="10" fill="#f2b8b8"/>' +
+      '<circle cx="44" cy="68" r="2" fill="' + INK + '"/><circle cx="56" cy="68" r="2" fill="' + INK + '"/>')],
+    ['ぶた', svgWrap('#fde0e6',
+      both('<path d="M25 40 L27 20 L43 30Z" fill="#f29fb2"/>') +
+      '<circle cx="50" cy="55" r="28" fill="#f7b6c2"/>' + eyes(50, 12) +
+      '<ellipse cx="50" cy="63" rx="11" ry="8" fill="#ef98aa"/>' +
+      '<ellipse cx="46" cy="63" rx="1.8" ry="2.6" fill="#b55a6d"/><ellipse cx="54" cy="63" rx="1.8" ry="2.6" fill="#b55a6d"/>' +
+      cheeks(61, 22, '#ef8fa3'))]
+  ];
+  var NO_AVATAR = svgWrap('#e6dddc', '<text x="50" y="65" text-anchor="middle" font-size="44" font-weight="700" font-family="sans-serif" fill="#77716f">?</text>');
+  function avatarSvg(i) { return (i >= 0 && i < AVATARS.length) ? AVATARS[i][1] : NO_AVATAR; }
+  function avaEl(i) { var s = el('span', 'ava'); s.innerHTML = avatarSvg(i); return s; }
+
   function answerTile(i, text, tag) {
     var b = document.createElement(tag || 'div');
     b.className = 'ans a' + (i + 1);
@@ -822,7 +939,7 @@
         li.appendChild(el('span', 'nm'));
         list.appendChild(li);
       }
-      li.querySelector('.ava').textContent = p.avatar >= 0 ? AVATARS[p.avatar] : '❔';
+      if (li.dataset.ava !== String(p.avatar)) { li.dataset.ava = String(p.avatar); li.querySelector('.ava').innerHTML = avatarSvg(p.avatar); }
       li.querySelector('.nm').textContent = p.name;
     });
     $('playerCount').textContent = H.order.length + '人';
@@ -940,7 +1057,7 @@
     var li = el('li');
     li.style.animationDelay = (i * 80) + 'ms';
     li.appendChild(el('span', 'rk', (i + 1) + '位'));
-    li.appendChild(el('span', 'ava', p.avatar >= 0 ? AVATARS[p.avatar] : '❔'));
+    li.appendChild(avaEl(p.avatar));
     li.appendChild(el('span', 'nm', p.name));
     li.appendChild(el('span', 'sc', p.score + '点'));
     li.appendChild(el('span', 'gain', withGain && H.gains[id] ? '+' + H.gains[id] : ''));
@@ -973,7 +1090,7 @@
       if (!id) return;
       var p = H.players[id];
       var st = el('div', 'stand p' + (i + 1));
-      st.appendChild(el('span', 'ava', p.avatar >= 0 ? AVATARS[p.avatar] : '❔'));
+      st.appendChild(avaEl(p.avatar));
       st.appendChild(el('span', 'nm', p.name));
       st.appendChild(el('span', 'sc', p.score + '点'));
       st.appendChild(el('div', 'block', String(i + 1)));
@@ -1061,9 +1178,10 @@
     var grid = $('avatarGrid');
     grid.textContent = '';
     AVATARS.forEach(function (a, i) {
-      var b = el('button', 'avatar-btn', a);
+      var b = el('button', 'avatar-btn');
+      b.innerHTML = a[1];
       b.type = 'button';
-      b.setAttribute('aria-label', 'アイコン' + (i + 1));
+      b.setAttribute('aria-label', a[0]);
       b.setAttribute('aria-pressed', String(P.picking === i));
       b.addEventListener('click', function () { P.picking = i; renderAvatarGrid(); $('avatarBtn').disabled = false; });
       grid.appendChild(b);
@@ -1106,7 +1224,7 @@
       show('pResult');
     } else if (msg.t === 'end') {
       var e = msg.results && msg.results[P.id];
-      $('endAva').textContent = P.avatar >= 0 ? AVATARS[P.avatar] : '❔';
+      $('endAva').innerHTML = avatarSvg(P.avatar);
       $('endName').textContent = P.name;
       $('endRank').textContent = e ? e.rank + '位！' : 'おつかれさま！';
       $('endScore').textContent = e ? e.score + '点 / ' + msg.players + '人中' : '';
@@ -1116,7 +1234,7 @@
   }
 
   function waitScreen(title, sub) {
-    $('meAva').textContent = P.avatar >= 0 ? AVATARS[P.avatar] : '❔';
+    $('meAva').innerHTML = avatarSvg(P.avatar);
     $('meName').textContent = P.name;
     $('waitTitle').textContent = title;
     $('waitMsg').textContent = sub;
