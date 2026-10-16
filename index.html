@@ -1,0 +1,1747 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>自己紹介ルーレット</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&family=Zen+Maru+Gothic:wght@500;700;900&display=swap">
+<style>
+  /* Layout: game-show stage. Wheel on the left is the one loud thing; the right column is a quiet score sheet.
+     The quiz maker (#quiz) is a backstage work surface: same tokens, no decoration. */
+  :root {
+    --bg: #fdf1f5;
+    --surface: #ffffff;
+    --ink: #2b2540;
+    --muted: #6f6885;
+    --line: #e9d9e2;
+    --pop: #ff7a9a;
+    --sun: #ffd23f;
+    --mint: #3dd6c6;
+    --paper: #ffffff;
+    --wheel-ink: #2b2540;
+    --dot-a: rgba(255, 122, 154, 0.22);
+    --dot-b: rgba(61, 214, 198, 0.24);
+    --dot-c: rgba(255, 210, 63, 0.38);
+    --shadow-sm: 0 2px 0 var(--ink);
+    --shadow-md: 0 5px 0 var(--ink);
+    --font-display: "Mochiy Pop One", "Hiragino Maru Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
+    --font-body: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
+    --radius: 18px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1d182c;
+      --surface: #2a2340;
+      --ink: #fbf2f7;
+      --muted: #b9b0cf;
+      --line: #40375c;
+      --paper: #fff8ef;
+      --dot-a: rgba(255, 122, 154, 0.16);
+      --dot-b: rgba(61, 214, 198, 0.14);
+      --dot-c: rgba(255, 210, 63, 0.14);
+      --shadow-sm: 0 2px 0 #0e0b18;
+      --shadow-md: 0 5px 0 #0e0b18;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1d182c;
+    --surface: #2a2340;
+    --ink: #fbf2f7;
+    --muted: #b9b0cf;
+    --line: #40375c;
+    --paper: #fff8ef;
+    --dot-a: rgba(255, 122, 154, 0.16);
+    --dot-b: rgba(61, 214, 198, 0.14);
+    --dot-c: rgba(255, 210, 63, 0.14);
+    --shadow-sm: 0 2px 0 #0e0b18;
+    --shadow-md: 0 5px 0 #0e0b18;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background-color: var(--bg);
+    background-image:
+      radial-gradient(circle at 8% 12%, var(--dot-a) 0 26px, transparent 27px),
+      radial-gradient(circle at 92% 8%, var(--dot-c) 0 40px, transparent 41px),
+      radial-gradient(circle at 96% 62%, var(--dot-b) 0 22px, transparent 23px),
+      radial-gradient(circle at 4% 78%, var(--dot-c) 0 18px, transparent 19px);
+    background-attachment: fixed;
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-weight: 500;
+    font-size: 16px;
+    line-height: 1.6;
+  }
+  body.mode-quiz { background-image: none; }
+  .page {
+    max-width: 1240px;
+    margin-inline: auto;
+    padding-inline: clamp(16px, 3vw, 40px);
+    padding-block: clamp(16px, 2.4vw, 28px) 40px;
+    display: flex;
+    flex-direction: column;
+    gap: clamp(16px, 2.4vw, 28px);
+  }
+
+  /* header */
+  .top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .brand { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .eyebrow {
+    font-weight: 900;
+    font-size: 0.8rem;
+    letter-spacing: 0.18em;
+    color: var(--muted);
+  }
+  h1 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: clamp(1.6rem, 1.1rem + 2.2vw, 2.6rem);
+    line-height: 1.2;
+    text-wrap: balance;
+  }
+  h1 .mark {
+    background: linear-gradient(transparent 62%, var(--sun) 62%);
+    padding-inline: 2px;
+  }
+  .tools { display: flex; flex-wrap: wrap; gap: 8px; }
+  .ghost {
+    font: inherit;
+    font-weight: 700;
+    font-size: 0.9rem;
+    min-height: 44px;
+    padding: 8px 16px;
+    border-radius: 999px;
+    border: 2px solid var(--ink);
+    background: var(--surface);
+    color: var(--ink);
+    cursor: pointer;
+    transition: transform 150ms ease-out, box-shadow 150ms ease-out;
+    box-shadow: var(--shadow-sm);
+  }
+  .ghost:hover:not(:disabled) { transform: translateY(-1px); }
+  .ghost:active:not(:disabled) { transform: translateY(2px); box-shadow: none; }
+  .ghost:disabled { opacity: 0.5; cursor: default; }
+  .ghost.quiet { border-color: var(--line); box-shadow: none; color: var(--muted); }
+  .ghost.quiet:hover:not(:disabled) { border-color: var(--ink); color: var(--ink); transform: none; }
+
+  /* stage */
+  .stage {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: clamp(20px, 3vw, 40px);
+    align-items: center;
+  }
+  @media (min-width: 900px) {
+    .stage { grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr); }
+  }
+
+  .wheel-col { display: flex; justify-content: center; min-width: 0; }
+  .wheel-wrap {
+    position: relative;
+    width: min(100%, 74vh, 620px);
+    max-width: 100%;
+    aspect-ratio: 1;
+    filter: drop-shadow(0 10px 0 rgba(43, 37, 64, 0.18));
+  }
+  #wheel {
+    display: block;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+    border-radius: 50%;
+  }
+  .pointer {
+    position: absolute;
+    left: 50%;
+    top: -2.5%;
+    width: 11%;
+    aspect-ratio: 1 / 1.15;
+    transform: translateX(-50%);
+    background: var(--wheel-ink);
+    clip-path: polygon(50% 100%, 0 0, 100% 0);
+    z-index: 2;
+  }
+  .pointer::after {
+    content: "";
+    position: absolute;
+    inset: 9% 17% 30% 17%;
+    background: var(--sun);
+    clip-path: polygon(50% 100%, 0 0, 100% 0);
+  }
+  .hub {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 24%;
+    aspect-ratio: 1;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    border: 4px solid var(--wheel-ink);
+    background: var(--paper);
+    color: var(--wheel-ink);
+    font-family: var(--font-display);
+    font-size: clamp(1rem, 0.6rem + 1.6vw, 1.7rem);
+    cursor: pointer;
+    z-index: 2;
+    transition: transform 150ms ease-out;
+  }
+  .hub:hover:not(:disabled) { transform: translate(-50%, -50%) scale(1.06); }
+  .hub:disabled { cursor: default; opacity: 0.85; }
+
+  /* right column */
+  .panel { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .round {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .round-no {
+    font-family: var(--font-display);
+    font-size: clamp(1.5rem, 1.1rem + 1.6vw, 2.2rem);
+    line-height: 1.2;
+  }
+  .round-no b {
+    font-weight: 400;
+    display: inline-block;
+    min-width: 1.6em;
+    text-align: center;
+    padding: 0 0.25em;
+    margin-right: 0.1em;
+    background: var(--ink);
+    color: var(--bg);
+    border-radius: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+  .round-note { color: var(--muted); font-weight: 700; }
+
+  .slots { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .slot {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 14px;
+    min-height: 104px;
+    padding: 14px 16px;
+    border-radius: var(--radius);
+    border: 3px dashed var(--line);
+    background: transparent;
+  }
+  .slot.next { border-color: var(--ink); }
+  .slot.filled {
+    border-style: solid;
+    border-color: var(--ink);
+    background: var(--surface);
+    box-shadow: var(--shadow-md);
+  }
+  .slot-tag {
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    border: 3px solid var(--wheel-ink);
+    color: var(--wheel-ink);
+    font-family: var(--font-display);
+    font-size: 0.8rem;
+    line-height: 1.1;
+    text-align: center;
+  }
+  .slot:nth-child(1) .slot-tag { background: var(--pop); }
+  .slot:nth-child(2) .slot-tag { background: var(--mint); }
+  .slot-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .slot-topic {
+    font-family: var(--font-display);
+    font-size: clamp(1.25rem, 0.95rem + 1.5vw, 2rem);
+    line-height: 1.3;
+    word-break: auto-phrase;
+    overflow-wrap: anywhere;
+  }
+  .slot-hint { color: var(--muted); font-weight: 700; font-size: 0.95rem; }
+  .slot-empty { color: var(--muted); font-weight: 700; }
+  .slot.pop { animation: pop 420ms cubic-bezier(.2, 1.5, .4, 1); }
+  @keyframes pop {
+    0% { transform: scale(0.9); }
+    100% { transform: scale(1); }
+  }
+  .redo {
+    font: inherit;
+    font-weight: 700;
+    font-size: 0.85rem;
+    min-height: 44px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 2px solid var(--line);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .redo:hover { border-color: var(--ink); color: var(--ink); }
+
+  .primary {
+    font-family: var(--font-display);
+    font-size: clamp(1.15rem, 0.95rem + 0.9vw, 1.5rem);
+    min-height: 64px;
+    padding: 12px 24px;
+    border-radius: 999px;
+    border: 3px solid var(--wheel-ink);
+    background: var(--sun);
+    color: var(--wheel-ink);
+    cursor: pointer;
+    box-shadow: 0 6px 0 var(--wheel-ink);
+    transition: transform 150ms ease-out, box-shadow 150ms ease-out;
+  }
+  .primary.go-next { background: var(--mint); }
+  .primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 0 var(--wheel-ink); }
+  .primary:active:not(:disabled) { transform: translateY(5px); box-shadow: 0 1px 0 var(--wheel-ink); }
+  .primary:disabled { cursor: default; opacity: 0.55; }
+
+  .order {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .order-title { font-weight: 900; font-size: 0.85rem; letter-spacing: 0.12em; color: var(--muted); }
+  .order ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    counter-reset: step;
+  }
+  .order li {
+    counter-increment: step;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px 6px 6px;
+    border-radius: 999px;
+    background: var(--surface);
+    border: 2px solid var(--line);
+    font-weight: 700;
+  }
+  .order li::before {
+    content: counter(step);
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--ink);
+    color: var(--bg);
+    font-weight: 900;
+    font-size: 0.9rem;
+  }
+
+  /* topic list */
+  .list { display: flex; flex-direction: column; gap: 12px; }
+  .list-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+  h2 { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 1.2rem; }
+  .count { color: var(--muted); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+  .chips li {
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: var(--surface);
+    border: 2px solid var(--line);
+    font-weight: 700;
+    font-size: 0.95rem;
+  }
+  .chips li.used { background: transparent; color: var(--muted); text-decoration: line-through; border-style: dashed; }
+
+  details.edit {
+    border: 2px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    padding: 4px 16px;
+  }
+  details.edit summary { cursor: pointer; font-weight: 700; padding: 10px 0; min-height: 44px; }
+  .edit-body { display: flex; flex-direction: column; gap: 12px; padding-bottom: 16px; }
+  .edit-body p { margin: 0; color: var(--muted); max-width: 65ch; }
+  textarea, .text-input {
+    width: 100%;
+    font: inherit;
+    padding: 12px;
+    border-radius: 12px;
+    border: 2px solid var(--line);
+    background: var(--bg);
+    color: var(--ink);
+  }
+  textarea { min-height: 260px; resize: vertical; }
+  .text-input { min-height: 48px; font-weight: 700; }
+  .text-input:focus, textarea:focus { border-color: var(--ink); }
+  .edit-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .msg { color: var(--muted); font-weight: 700; margin: 0; }
+
+  :focus-visible { outline: 3px solid var(--mint); outline-offset: 3px; }
+
+  #confetti { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+
+  /* ---------- quiz maker (backstage) ---------- */
+  .q-page { max-width: 1100px; }
+  .q-h1 { font-size: clamp(1.4rem, 1.1rem + 1.2vw, 1.9rem); }
+  .q-note { margin: 0; color: var(--muted); font-weight: 700; max-width: 65ch; }
+  .q-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
+  @media (min-width: 900px) {
+    .q-grid { grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr); }
+  }
+  .q-card {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-width: 0;
+    padding: 20px;
+    border-radius: var(--radius);
+    border: 2px solid var(--line);
+    background: var(--surface);
+  }
+  .field { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .field-label { display: flex; align-items: center; gap: 8px; font-weight: 900; }
+  .field-label .step {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--ink);
+    color: var(--surface);
+    font-size: 0.85rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .field-sub { color: var(--muted); font-weight: 700; font-size: 0.9rem; }
+  .pick { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip-btn {
+    font: inherit;
+    font-weight: 700;
+    min-height: 44px;
+    padding: 6px 16px;
+    border-radius: 999px;
+    border: 2px solid var(--line);
+    background: var(--bg);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .chip-btn:hover { border-color: var(--ink); }
+  .chip-btn[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--surface); }
+  .chip-btn.done::after { content: " ✓"; }
+  .round-group { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .round-name { min-width: 4.5em; font-weight: 900; font-variant-numeric: tabular-nums; }
+  .round-name.now { color: var(--ink); }
+  .round-name.now::after {
+    content: "いま";
+    margin-left: 6px;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: var(--sun);
+    color: var(--wheel-ink);
+    font-size: 0.75rem;
+  }
+  .rounds { display: flex; flex-direction: column; gap: 8px; }
+  details.more summary { cursor: pointer; font-weight: 700; color: var(--muted); min-height: 44px; padding-block: 10px; }
+  .inline { display: flex; gap: 8px; }
+  .inline .text-input { flex: 1; min-width: 0; }
+  .act {
+    font: inherit;
+    font-weight: 900;
+    font-size: 1.05rem;
+    min-height: 52px;
+    padding: 10px 20px;
+    border-radius: 14px;
+    border: 2px solid var(--wheel-ink);
+    background: var(--sun);
+    color: var(--wheel-ink);
+    cursor: pointer;
+  }
+  .act.save { background: var(--mint); }
+  .act:disabled { opacity: 0.5; cursor: default; }
+  .ans { display: grid; grid-template-columns: 4.2em minmax(0, 1fr); align-items: center; gap: 8px; }
+  .tag {
+    justify-self: start;
+    padding: 2px 10px;
+    border-radius: 999px;
+    border: 2px solid var(--line);
+    font-weight: 900;
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+  .tag.ok { background: var(--mint); border-color: var(--wheel-ink); color: var(--wheel-ink); }
+  .tag.joke { background: var(--sun); border-color: var(--wheel-ink); color: var(--wheel-ink); }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .row .act { flex: 1 1 200px; }
+  .empty { margin: 0; color: var(--muted); font-weight: 700; }
+
+  .saved { display: flex; flex-direction: column; gap: 12px; }
+  .saved-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; counter-reset: q; }
+  .saved-item {
+    counter-increment: q;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 16px;
+    border-radius: var(--radius);
+    border: 2px solid var(--line);
+    background: var(--surface);
+  }
+  .saved-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .saved-no { font-weight: 900; color: var(--muted); }
+  .saved-no::before { content: "Q" counter(q); }
+  .copy-cell {
+    display: grid;
+    grid-template-columns: 4.2em minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 44px;
+    padding: 6px 12px;
+    border-radius: 12px;
+    border: 2px solid var(--line);
+    background: var(--bg);
+    color: var(--ink);
+    font: inherit;
+    font-weight: 700;
+    text-align: left;
+    cursor: pointer;
+  }
+  .copy-cell:hover { border-color: var(--ink); }
+  .copy-cell .txt { min-width: 0; overflow-wrap: anywhere; }
+  .copy-cell .hint { color: var(--muted); font-size: 0.8rem; white-space: nowrap; }
+  .answers { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  @media (min-width: 700px) { .answers { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .slot.pop { animation: none; }
+    .ghost, .primary, .hub { transition: none; }
+  }
+</style>
+
+<div class="page" id="viewRoulette">
+  <header class="top">
+    <div class="brand">
+      <span class="eyebrow">ようこそ交流会</span>
+      <h1><span class="mark">自己紹介ルーレット</span></h1>
+    </div>
+    <div class="tools">
+      <button type="button" class="ghost" id="soundBtn" aria-pressed="true">音：オン</button>
+      <button type="button" class="ghost" id="resetBtn">最初からやり直す</button>    </div>
+  </header>
+
+  <main class="stage">
+    <div class="wheel-col">
+      <div class="wheel-wrap">
+        <div class="pointer" aria-hidden="true"></div>
+        <canvas id="wheel" role="img" aria-label="お題ルーレット"></canvas>
+        <button type="button" class="hub" id="hubBtn">回す</button>
+      </div>
+    </div>
+
+    <section class="panel" aria-live="polite">
+      <div class="round">
+        <span class="round-no"><b id="roundNo">1</b>組目のお題</span>
+        <span class="round-note">2人が同じお題で話します</span>
+      </div>
+
+      <div class="slots">
+        <div class="slot" id="slot0">
+          <span class="slot-tag">お題<br>1</span>
+          <div class="slot-body"></div>
+        </div>
+        <div class="slot" id="slot1">
+          <span class="slot-tag">お題<br>2</span>
+          <div class="slot-body"></div>
+        </div>
+      </div>
+
+      <button type="button" class="primary" id="mainBtn">1つ目のお題を決める</button>
+
+      <div class="order">
+        <span class="order-title">話す順番</span>
+        <ol>
+          <li>名前</li>
+          <li>はたらいている場所</li>
+          <li>お題1の答え</li>
+          <li>お題2の答え</li>
+        </ol>
+      </div>
+    </section>
+  </main>
+
+  <section class="list">
+    <div class="list-head">
+      <h2>お題リスト</h2>
+      <span class="count" id="count"></span>
+    </div>
+    <ul class="chips" id="chips"></ul>
+
+    <details class="edit">
+      <summary>お題を書きかえる</summary>
+      <div class="edit-body">
+        <p>1行に1つずつ書きます。セットすると、いまの進み具合はリセットされて1組目からになります。</p>
+        <textarea id="topicsInput" aria-label="お題（1行に1つ）"></textarea>
+        <div class="edit-actions">
+          <button type="button" class="ghost" id="applyBtn">この内容でセットする</button>
+          <button type="button" class="ghost" id="defaultBtn">おすすめ20個に戻す</button>
+          <span class="msg" id="editMsg" role="status"></span>
+        </div>
+      </div>
+    </details>
+  </section>
+</div>
+
+<div class="page q-page" id="viewQuiz" hidden>
+  <header class="top">
+    <div class="brand">
+      <span class="eyebrow">裏方用</span>
+      <h1 class="q-h1">クイズづくり</h1>
+    </div>
+  </header>
+  <p class="q-note" id="engineNote">名前と作った問題は、この端末の中だけに保存されます。</p>
+
+  <div class="q-grid">
+    <section class="q-card" aria-label="問題をつくる">
+      <div class="field">
+        <div class="field-label"><span class="step">1</span>だれの答え？</div>
+        <div class="pick" id="nameChips"></div>
+        <form class="inline" id="nameForm">
+          <input class="text-input" id="nameInput" type="text" autocomplete="off" placeholder="名前を追加（1回入れたら次からは選ぶだけ）" aria-label="名前を追加">
+          <button type="submit" class="ghost">追加</button>
+        </form>
+        <div class="row">
+          <button type="button" class="ghost quiet" id="clearNamesBtn">名前をリセット</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="field-label"><span class="step">2</span>お題</div>
+        <span class="field-sub" id="syncNote"></span>
+        <div class="rounds" id="roundGroups"></div>
+        <details class="more" id="allTopics">
+          <summary>すべてのお題から選ぶ</summary>
+          <div class="pick" id="allTopicChips"></div>
+        </details>
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="answerInput"><span class="step">3</span>正解（本人が話した答え）</label>
+        <input class="text-input" id="answerInput" type="text" autocomplete="off" placeholder="例：映画を見に行く">
+      </div>
+
+      <div class="field">
+        <div class="field-label"><span class="step">4</span>ハズレの雰囲気</div>
+        <div class="pick" id="modeChips"></div>
+      </div>
+
+      <button type="button" class="act" id="genBtn">ハズレを3つつくる</button>
+      <p class="msg" id="genMsg" role="status"></p>
+    </section>
+
+    <section class="q-card" aria-label="できた問題">
+      <h2>できた問題</h2>
+      <p class="empty" id="draftEmpty">左で「だれ・お題・正解」を入れてボタンを押すと、ここに4択ができあがります。ハズレは手で直せます。</p>
+      <div class="field" id="draftBody" hidden>
+        <label class="field-sub" for="dQ">問題文</label>
+        <input class="text-input" id="dQ" type="text" autocomplete="off">
+        <div class="ans"><span class="tag ok">正解</span><input class="text-input" id="dC" type="text" autocomplete="off" aria-label="正解"></div>
+        <div class="ans"><span class="tag" id="dT0">似てる</span><input class="text-input" id="dW0" type="text" autocomplete="off" aria-label="ハズレ1"></div>
+        <div class="ans"><span class="tag" id="dT1">似てる</span><input class="text-input" id="dW1" type="text" autocomplete="off" aria-label="ハズレ2"></div>
+        <div class="ans"><span class="tag" id="dT2">似てる</span><input class="text-input" id="dW2" type="text" autocomplete="off" aria-label="ハズレ3"></div>
+        <div class="row">
+          <button type="button" class="ghost" id="regenBtn">ハズレをつくり直す</button>
+          <button type="button" class="act save" id="saveBtn">この問題を保存する</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <section class="saved">
+    <div class="list-head">
+      <h2>保存した問題</h2>
+      <span class="count" id="savedCount"></span>
+      <button type="button" class="ghost" id="csvBtn">Blooket用のCSVを保存</button>
+      <button type="button" class="ghost quiet" id="copyAllBtn">テンプレート用にコピー（B3に貼りつけ）</button>
+    </div>
+    <p class="msg" id="csvMsg" role="status"></p>
+    <p class="empty" id="savedEmpty">まだありません。保存した問題は、Blooketのテンプレートと同じ並びのCSVにまとめて保存できます。文字をタップすれば1つずつコピーもできます。</p>
+    <ol class="saved-list" id="savedList"></ol>
+  </section>
+</div>
+
+<canvas id="confetti" aria-hidden="true"></canvas>
+
+<script>
+(function () {
+  'use strict';
+
+  // [label on the wheel, question shown under the drawn topic, quiz question ({n} = "○○さん")]
+  var DEFAULTS = [
+    ['休日の過ごし方', '休みの日はどう過ごすことが多い？', '{n}の休日の過ごし方は？'],
+    ['ハマっていること', '最近いちばん時間を使っている趣味は？', '{n}がいまハマっていることは？'],
+    ['好きな食べ物', 'これなら毎日でも食べられる！は？', '{n}の好きな食べ物は？'],
+    ['最近のお買い物', '最近買ってよかったものは？', '{n}が最近買ってよかったものは？'],
+    ['好きな映画・ドラマ', '何度も見た作品、最近見た作品は？', '{n}の好きな映画・ドラマは？'],
+    ['好きな音楽', 'よく聴く曲やアーティストは？', '{n}がよく聴く音楽は？'],
+    ['行ってみたい場所', '国内でも海外でも。行くなら何をしたい？', '{n}が行ってみたい場所は？'],
+    ['子どもの頃の夢', '小さいころ、何になりたかった？', '{n}の子どもの頃の夢は？'],
+    ['動物にたとえると', '自分を動物にたとえると？その理由は？', '{n}を動物にたとえると？'],
+    ['コンビニの定番', 'コンビニでつい買ってしまうものは？', '{n}がコンビニでつい買うものは？'],
+    ['朝ごはんの定番', '朝はなにを食べることが多い？', '{n}の朝ごはんの定番は？'],
+    ['犬派？猫派？', 'どっち派？それ以外でもOK', '{n}は犬派？猫派？'],
+    ['ちょっとした特技', '人よりちょっと得意なことは？', '{n}のちょっとした特技は？'],
+    ['うれしかったこと', '小さなことでOK。最近うれしかったのは？', '{n}が最近うれしかったことは？'],
+    ['部活・習いごと', '学生時代にやっていたことは？', '{n}が学生時代にやっていたことは？'],
+    ['好きな季節', '好きな季節と、その季節の楽しみは？', '{n}の好きな季節は？'],
+    ['リフレッシュ方法', '疲れたとき、どうやって元気を出す？', '{n}のリフレッシュ方法は？'],
+    ['無人島に1つだけ', '無人島にひとつだけ持っていけるなら？', '{n}が無人島にひとつだけ持っていくものは？'],
+    ['100万円あったら', 'ぽんともらえたら、何に使う？', '{n}は100万円あったら何に使う？'],
+    ['やってみたいこと', 'これからチャレンジしたいことは？', '{n}がこれからやってみたいことは？']
+  ];
+  var HINTS = {};
+  var QUESTIONS = {};
+  DEFAULTS.forEach(function (d) { HINTS[d[0]] = d[1]; QUESTIONS[d[0]] = d[2]; });
+  var DEFAULT_LABELS = DEFAULTS.map(function (d) { return d[0]; });
+
+  // Stand-by wrong answers, used when Claude is not reachable. s = plausible, j = joke.
+  var POOLS = {
+    '休日の過ごし方': { s: ['映画を見に行く', 'カフェめぐり', '家でゴロゴロ', '買い物に出かける', '友だちとごはん', 'ドライブ'], j: ['山で修行', '一日中逆立ち', '宇宙と交信', '庭で石をみがく'] },
+    'ハマっていること': { s: ['筋トレ', 'サウナ', '韓国ドラマ', 'スマホゲーム', '料理', 'カメラ'], j: ['石あつめ', '雲の観察', 'ひとりしりとり', '泥だんご作り'] },
+    '好きな食べ物': { s: ['ラーメン', 'お寿司', 'カレー', '焼肉', 'オムライス', 'からあげ'], j: ['氷', 'パセリだけ', 'かつおぶし単品', '給食のソフト麺'] },
+    '最近のお買い物': { s: ['ワイヤレスイヤホン', 'スニーカー', '加湿器', 'マッサージガン', '電気ケトル', 'リュック'], j: ['無人島', '馬', '等身大のはにわ', '金の延べ棒'] },
+    '好きな映画・ドラマ': { s: ['ジブリ作品', 'ディズニー映画', '韓国ドラマ', '刑事ドラマ', 'アクション映画', '恋愛ドラマ'], j: ['天気予報', '通販番組', '自分のホームビデオ', '防犯カメラの映像'] },
+    '好きな音楽': { s: ['J-POP', 'K-POP', 'ロック', 'アニソン', 'ボカロ', '洋楽'], j: ['お経', '校歌', '冷蔵庫の音', 'スーパーの店内BGM'] },
+    '行ってみたい場所': { s: ['沖縄', '北海道', 'ハワイ', '韓国', '京都', 'イタリア'], j: ['月', '竜宮城', '深海', 'となりの家'] },
+    '子どもの頃の夢': { s: ['ケーキ屋さん', 'サッカー選手', '保育士', 'お花屋さん', '警察官', '学校の先生'], j: ['忍者', '魔法使い', '恐竜', '石油王'] },
+    '動物にたとえると': { s: ['犬', '猫', 'うさぎ', 'パンダ', 'コアラ', 'ハムスター'], j: ['ツチノコ', 'ミジンコ', 'ティラノサウルス', 'カッパ'] },
+    'コンビニの定番': { s: ['おにぎり', 'カフェラテ', 'からあげ', 'チョコ', 'アイス', 'サンドイッチ'], j: ['おでんの汁だけ', 'レジ袋', '割りばし', '店ごと全部'] },
+    '朝ごはんの定番': { s: ['トースト', '納豆ごはん', 'ヨーグルト', 'おにぎり', 'コーヒーだけ', 'バナナ'], j: ['ステーキ', 'ひとり鍋', '流しそうめん', 'フルコース'] },
+    '犬派？猫派？': { s: ['犬派', '猫派', 'どっちも派', 'うさぎ派', 'ハムスター派', '鳥派'], j: ['カッパ派', '恐竜派', '石派', '無所属'] },
+    'ちょっとした特技': { s: ['早起き', '料理', '暗算', 'ピアノ', '似顔絵', '早口言葉'], j: ['瞬間移動', '空中浮遊', 'スプーン曲げ', '白目'] },
+    'うれしかったこと': { s: ['ほめられた', '臨時収入があった', '推しに会えた', '天気がよかった', 'ごはんがおいしかった', '友だちに会えた'], j: ['宝くじ3億円', '宇宙人と握手', '石油を掘りあてた', '空を飛べた'] },
+    '部活・習いごと': { s: ['バスケ部', '吹奏楽部', 'テニス部', 'ピアノ', '水泳', '書道'], j: ['忍術', '帰宅部のエース', '魔法学校', '相撲部屋'] },
+    '好きな季節': { s: ['春', '夏', '秋', '冬'], j: ['梅雨', '花粉の季節', '年末', '給料日'] },
+    'リフレッシュ方法': { s: ['カラオケ', 'たくさん寝る', 'お風呂にゆっくり', '甘いものを食べる', '散歩', '音楽を聴く'], j: ['滝に打たれる', '山に叫ぶ', '壁と話す', '冬の海にダイブ'] },
+    '無人島に1つだけ': { s: ['ナイフ', 'ライター', 'スマホ', 'テント', '水', '釣り竿'], j: ['こたつ', 'グランドピアノ', '冷蔵庫', '自宅'] },
+    '100万円あったら': { s: ['旅行に行く', '貯金する', '家電を買いかえる', '親にプレゼント', '引っ越し', '推し活'], j: ['全部うまい棒', '池に投げる', '壁にかざる', '1円玉に両替'] },
+    'やってみたいこと': { s: ['資格の勉強', '一人旅', '筋トレ', '英会話', '料理', '富士登山'], j: ['世界征服', '宇宙旅行', 'UFOを呼ぶ', '総理大臣'] }
+  };
+  var GENERIC_JOKES = ['ひみつ', '宇宙', '覚えていない', 'ぜんぶ', '夢の中', '気合い'];
+
+  var STORE_KEY = 'intro-roulette-v1';
+  var QUIZ_KEY = 'intro-quiz-v1';
+  var TAU = Math.PI * 2;
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function $(id) { return document.getElementById(id); }
+
+  // =====================================================================
+  // Roulette
+  // =====================================================================
+  var state = { topics: DEFAULT_LABELS.slice(), used: [], slots: [null, null], round: 1, sound: true, past: [] };
+  var wheel = [];        // topic indexes currently drawn on the wheel
+  var winner = null;     // position in `wheel` of the segment that just won
+  var rot = 0;
+  var spinning = false;
+  var blink = 0;
+
+  var canvas = $('wheel');
+  var ctx = canvas.getContext('2d');
+  var wrap = canvas.parentElement;
+  var hubBtn = $('hubBtn');
+  var mainBtn = $('mainBtn');
+  var soundBtn = $('soundBtn');
+  var slotEls = [$('slot0'), $('slot1')];
+  var size = 0;
+
+  var db = null;
+  var dbWriting = false;
+  var dbDirty = false;
+
+  function load(data) {
+    var s = data;
+    if (!s) {
+      try { s = JSON.parse(localStorage.getItem(STORE_KEY) || 'null'); } catch (e) { s = null; }
+    }
+    if (s && Array.isArray(s.topics) && s.topics.length >= 2) {
+      state.topics = s.topics.map(String);
+      state.used = (s.used || []).filter(function (i) { return i >= 0 && i < state.topics.length; });
+      state.slots = [0, 1].map(function (j) {
+        var v = s.slots ? s.slots[j] : null;
+        return (typeof v === 'number' && v < state.topics.length) ? v : null;
+      });
+      state.round = Math.max(1, s.round | 0);
+      state.sound = s.sound !== false;
+      state.past = Array.isArray(s.past) ? s.past.filter(Array.isArray) : [];
+      state.at = Number(s.at) || 0;
+    }
+  }
+
+  // What the quiz maker needs to know about the game, as plain labels.
+  function progress() {
+    return {
+      round: state.round,
+      current: state.slots.map(function (i) { return i === null ? '' : state.topics[i]; }),
+      past: state.past.map(function (p) { return { a: String(p[0] || ''), b: String(p[1] || '') }; }),
+      topics: state.topics.slice(),
+      at: state.at || 0
+    };
+  }
+
+  // Same-browser tabs hear each other directly; the stored copy and the db are the fallbacks.
+  var channel = null;
+  try { channel = new BroadcastChannel('intro-roulette'); } catch (e) { channel = null; }
+
+  function pushProgress() {
+    if (!db) return;
+    if (dbWriting) { dbDirty = true; return; }
+    dbWriting = true;
+    db.doc('game/state').set(progress()).catch(function () { /* the wheel works without sync */ }).then(function () {
+      dbWriting = false;
+      if (dbDirty) { dbDirty = false; pushProgress(); }
+    });
+  }
+
+  function save(sync) {
+    if (sync) state.at = Date.now();
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { /* storage is optional */ }
+    if (sync) {
+      applySync(progress());
+      if (channel) { try { channel.postMessage(progress()); } catch (e) { /* other paths still run */ } }
+      pushProgress();
+    }
+  }
+
+  function rebuildWheel() {
+    wheel = [];
+    for (var i = 0; i < state.topics.length; i++) {
+      if (state.used.indexOf(i) === -1) wheel.push(i);
+    }
+    winner = null;
+  }
+
+  function token(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+
+  function segColor(i, n, colors) {
+    var c = i % colors.length;
+    if (i === n - 1 && c === 0 && n > 1) c = 2; // keep the last segment from matching the first
+    return colors[c];
+  }
+
+  function draw() {
+    if (!size) return;
+    var R = size / 2;
+    var ink = token('--wheel-ink');
+    var colors = [token('--pop'), token('--sun'), token('--mint'), token('--paper')];
+    var n = wheel.length;
+    var rim = Math.max(10, R * 0.065);
+    var Rs = R - rim;
+
+    ctx.clearRect(0, 0, size, size);
+    ctx.save();
+    ctx.translate(R, R);
+
+    ctx.beginPath();
+    ctx.arc(0, 0, R, 0, TAU);
+    ctx.fillStyle = ink;
+    ctx.fill();
+
+    // marquee bulbs on the rim
+    var bulbs = 24;
+    for (var b = 0; b < bulbs; b++) {
+      var ba = (b / bulbs) * TAU;
+      var on = (b + blink) % 2 === 0;
+      ctx.beginPath();
+      ctx.arc(Math.cos(ba) * (R - rim / 2), Math.sin(ba) * (R - rim / 2), rim * 0.24, 0, TAU);
+      ctx.fillStyle = on ? colors[1] : colors[3];
+      ctx.globalAlpha = on ? 1 : 0.55;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+
+    if (n === 0) {
+      ctx.beginPath();
+      ctx.arc(0, 0, Rs, 0, TAU);
+      ctx.fillStyle = colors[3];
+      ctx.fill();
+      ctx.restore();
+      return;
+    }
+
+    var a = TAU / n;
+    var family = getComputedStyle(document.body).fontFamily;
+    ctx.rotate(rot);
+    for (var i = 0; i < n; i++) {
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.arc(0, 0, Rs, i * a, (i + 1) * a);
+      ctx.closePath();
+      ctx.fillStyle = segColor(i, n, colors);
+      ctx.fill();
+      if (winner !== null && i !== winner) {
+        ctx.fillStyle = 'rgba(255,255,255,0.55)';
+        ctx.fill();
+      }
+      ctx.lineWidth = Math.max(1.5, R * 0.006);
+      ctx.strokeStyle = ink;
+      ctx.stroke();
+    }
+    if (winner !== null) {
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.arc(0, 0, Rs, winner * a, (winner + 1) * a);
+      ctx.closePath();
+      ctx.lineWidth = Math.max(4, R * 0.02);
+      ctx.strokeStyle = ink;
+      ctx.stroke();
+    }
+
+    // labels run along the radius, outer edge first
+    var outer = Rs - R * 0.05;
+    var inner = R * 0.3;
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = ink;
+    for (var k = 0; k < n; k++) {
+      var label = state.topics[wheel[k]];
+      var fs = Math.min(R * 0.095, Math.max(10, Rs * a * 0.34));
+      var w;
+      for (;;) {
+        ctx.font = '900 ' + fs + 'px ' + family;
+        w = ctx.measureText(label).width;
+        var fitsLength = w <= outer - inner;
+        var fitsWidth = n < 3 || (outer - w) * a >= fs * 1.15;
+        if ((fitsLength && fitsWidth) || fs <= 9) break;
+        fs -= 1;
+      }
+      ctx.save();
+      ctx.rotate((k + 0.5) * a);
+      ctx.globalAlpha = (winner !== null && k !== winner) ? 0.5 : 1;
+      ctx.fillText(label, outer, 0, outer - inner);
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
+  function resize() {
+    var w = wrap.clientWidth;
+    if (!w) return;
+    var dpr = window.devicePixelRatio || 1;
+    size = w;
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(w * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    draw();
+  }
+
+  // ---------- sound ----------
+  var audio = null;
+  function beep(freq, dur, type, vol, when) {
+    if (!state.sound) return;
+    try {
+      if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
+      var t = audio.currentTime + (when || 0);
+      var o = audio.createOscillator();
+      var g = audio.createGain();
+      o.type = type || 'triangle';
+      o.frequency.value = freq;
+      g.gain.setValueAtTime(vol || 0.08, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g);
+      g.connect(audio.destination);
+      o.start(t);
+      o.stop(t + dur);
+    } catch (e) { /* sound is optional */ }
+  }
+  function fanfare() {
+    [523, 659, 784, 1047].forEach(function (f, i) { beep(f, 0.22, 'triangle', 0.1, i * 0.11); });
+  }
+
+  // ---------- confetti ----------
+  var cCanvas = $('confetti');
+  var cCtx = cCanvas.getContext('2d');
+  var bits = [];
+  var confettiRunning = false;
+  function confetti() {
+    if (reduceMotion) return;
+    var W = cCanvas.width = window.innerWidth;
+    var H = cCanvas.height = window.innerHeight;
+    var colors = [token('--pop'), token('--sun'), token('--mint'), token('--ink')];
+    for (var i = 0; i < 140; i++) {
+      bits.push({
+        x: W / 2 + (Math.random() - 0.5) * W * 0.5,
+        y: H * 0.35,
+        vx: (Math.random() - 0.5) * 14,
+        vy: -6 - Math.random() * 10,
+        s: 6 + Math.random() * 8,
+        r: Math.random() * TAU,
+        vr: (Math.random() - 0.5) * 0.4,
+        c: colors[i % colors.length],
+        life: 0
+      });
+    }
+    if (confettiRunning) return;
+    confettiRunning = true;
+    (function step() {
+      cCtx.clearRect(0, 0, W, H);
+      bits = bits.filter(function (p) { return p.y < H + 30 && p.life < 200; });
+      bits.forEach(function (p) {
+        p.vy += 0.35; p.vx *= 0.99; p.x += p.vx; p.y += p.vy; p.r += p.vr; p.life++;
+        cCtx.save();
+        cCtx.translate(p.x, p.y);
+        cCtx.rotate(p.r);
+        cCtx.fillStyle = p.c;
+        cCtx.fillRect(-p.s / 2, -p.s / 3, p.s, p.s * 0.66);
+        cCtx.restore();
+      });
+      if (bits.length) requestAnimationFrame(step);
+      else { confettiRunning = false; cCtx.clearRect(0, 0, W, H); }
+    })();
+  }
+
+  // ---------- game ----------
+  function mod(x, m) { return ((x % m) + m) % m; }
+  function remaining() { return state.topics.length - state.used.length; }
+
+  function spin() {
+    if (spinning) return;
+    var slot = state.slots.indexOf(null);
+    if (slot === -1) return;
+    rebuildWheel();
+    var n = wheel.length;
+    if (!n) return;
+
+    var a = TAU / n;
+    var k = Math.floor(Math.random() * n);
+    var f = 0.2 + Math.random() * 0.6;
+    var target = -Math.PI / 2 - (k + f) * a;
+    var delta = mod(target - rot, TAU) + TAU * (5 + Math.floor(Math.random() * 3));
+    var start = rot;
+    var dur = reduceMotion ? 1200 : 5200;
+    var t0 = null;
+    var lastSeg = -1;
+    var lastBlink = 0;
+
+    spinning = true;
+    render();
+    beep(880, 0.05, 'square', 0.05);
+
+    function frame(now) {
+      if (t0 === null) t0 = now;
+      var t = Math.min(1, (now - t0) / dur);
+      rot = start + delta * (1 - Math.pow(1 - t, 4));
+      var seg = Math.floor(mod(-Math.PI / 2 - rot, TAU) / a);
+      if (seg !== lastSeg) { lastSeg = seg; beep(1200, 0.03, 'square', 0.04); }
+      if (now - lastBlink > 110) { blink++; lastBlink = now; }
+      draw();
+      if (t < 1) { requestAnimationFrame(frame); return; }
+
+      rot = mod(start + delta, TAU);
+      spinning = false;
+      winner = k;
+      state.used.push(wheel[k]);
+      state.slots[slot] = wheel[k];
+      save(true);
+      render();
+      slotEls[slot].classList.remove('pop');
+      void slotEls[slot].offsetWidth;
+      slotEls[slot].classList.add('pop');
+      fanfare();
+      confetti();
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function nextPair() {
+    state.past.push(state.slots.map(function (i) { return state.topics[i]; }));
+    state.round++;
+    state.slots = [null, null];
+    rebuildWheel();
+    save(true);
+    render();
+  }
+
+  function primaryAction() {
+    if (spinning) return;
+    if (state.slots.indexOf(null) === -1) nextPair();
+    else spin();
+  }
+
+  function redo(j) {
+    if (spinning) return;
+    state.slots[j] = null;
+    save(true);
+    render();
+  }
+
+  function resetGame(topics) {
+    if (spinning) return;
+    if (topics) state.topics = topics;
+    state.used = [];
+    state.slots = [null, null];
+    state.round = 1;
+    state.past = [];
+    rebuildWheel();
+    save(true);
+    render();
+  }
+
+  function render() {
+    $('roundNo').textContent = state.round;
+    var nextSlot = state.slots.indexOf(null);
+    var left = remaining();
+
+    slotEls.forEach(function (el, j) {
+      var body = el.querySelector('.slot-body');
+      var old = el.querySelector('.redo');
+      if (old) old.remove();
+      body.textContent = '';
+      var idx = state.slots[j];
+      el.classList.toggle('filled', idx !== null);
+      el.classList.toggle('next', idx === null && j === nextSlot);
+      if (idx === null) {
+        var p = document.createElement('span');
+        p.className = 'slot-empty';
+        p.textContent = (spinning && j === nextSlot) ? 'どれになるかな…' : 'ルーレットで決まります';
+        body.appendChild(p);
+        return;
+      }
+      var label = state.topics[idx];
+      var t = document.createElement('span');
+      t.className = 'slot-topic';
+      t.textContent = label;
+      body.appendChild(t);
+      if (HINTS[label]) {
+        var h = document.createElement('span');
+        h.className = 'slot-hint';
+        h.textContent = HINTS[label];
+        body.appendChild(h);
+      }
+      if (!spinning && left > 0) {
+        var r = document.createElement('button');
+        r.type = 'button';
+        r.className = 'redo';
+        r.textContent = '引き直す';
+        r.addEventListener('click', function () { redo(j); });
+        el.appendChild(r);
+      }
+    });
+
+    var label, disabled = spinning;
+    mainBtn.classList.remove('go-next');
+    if (spinning) label = '回っています…';
+    else if (nextSlot === -1) { label = '次のペアへ進む'; mainBtn.classList.add('go-next'); }
+    else if (left === 0) { label = 'お題を使い切りました'; disabled = true; }
+    else label = (nextSlot === 0 ? '1つ目' : '2つ目') + 'のお題を決める';
+    mainBtn.textContent = label;
+    mainBtn.disabled = disabled;
+    hubBtn.textContent = nextSlot === -1 ? '次へ' : '回す';
+    hubBtn.disabled = disabled;
+
+    soundBtn.textContent = '音：' + (state.sound ? 'オン' : 'オフ');
+    soundBtn.setAttribute('aria-pressed', String(state.sound));
+
+    $('count').textContent = '残り ' + left + ' / ' + state.topics.length;
+    var chips = $('chips');
+    chips.textContent = '';
+    state.topics.forEach(function (name, i) {
+      var li = document.createElement('li');
+      li.textContent = name;
+      if (state.used.indexOf(i) !== -1) li.className = 'used';
+      chips.appendChild(li);
+    });
+    draw();
+  }
+
+  // =====================================================================
+  // Quiz maker
+  // =====================================================================
+  var MODES = [
+    ['auto', 'おまかせ'],
+    ['hard', '全部まぎらわしい'],
+    ['mix', 'まぜる'],
+    ['easy', '全部ネタ']
+  ];
+  var quiz = { names: [], items: [] };
+  var sel = { name: null, topic: null, mode: 'auto' };
+  var sync = { at: 0, round: 1, current: ['', ''], past: [], topics: DEFAULT_LABELS.slice() };
+  var draft = null;       // { name, topic, types: [..] } for the question on screen
+  var sampleFn = null;
+  var downloadsCap = null;
+  var busy = false;
+
+  var answerInput = $('answerInput');
+  var genBtn = $('genBtn');
+  var genMsg = $('genMsg');
+  var dW = [$('dW0'), $('dW1'), $('dW2')];
+  var dT = [$('dT0'), $('dT1'), $('dT2')];
+
+  function loadQuiz() {
+    try {
+      var q = JSON.parse(localStorage.getItem(QUIZ_KEY) || 'null');
+      if (q && Array.isArray(q.names) && Array.isArray(q.items)) quiz = q;
+    } catch (e) { /* start empty */ }
+  }
+  function saveQuiz() {
+    try { localStorage.setItem(QUIZ_KEY, JSON.stringify(quiz)); } catch (e) { /* storage is optional */ }
+  }
+
+  function applySync(p) {
+    if (!p || typeof p !== 'object') return;
+    if ((Number(p.at) || 0) < (sync.at || 0)) return;   // an older copy arriving late
+    sync = {
+      at: Number(p.at) || 0,
+      round: Math.max(1, p.round | 0),
+      current: Array.isArray(p.current) ? p.current.map(String) : ['', ''],
+      past: Array.isArray(p.past) ? p.past : [],
+      topics: Array.isArray(p.topics) && p.topics.length ? p.topics.map(String) : sync.topics
+    };
+    if (!$('viewQuiz').hidden) renderQuiz();
+  }
+
+  function chip(text, pressed, onClick, extraClass) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'chip-btn' + (extraClass ? ' ' + extraClass : '');
+    b.textContent = text;
+    b.setAttribute('aria-pressed', String(pressed));
+    b.addEventListener('click', onClick);
+    return b;
+  }
+
+  function isDone(name, topic) {
+    return !!name && quiz.items.some(function (it) { return it.name === name && it.topic === topic; });
+  }
+
+  function topicChip(topic) {
+    return chip(topic, sel.topic === topic, function () {
+      sel.topic = topic;
+      renderQuiz();
+      answerInput.focus();
+    }, isDone(sel.name, topic) ? 'done' : '');
+  }
+
+  function renderQuiz() {
+    var names = $('nameChips');
+    names.textContent = '';
+    quiz.names.forEach(function (n) {
+      names.appendChild(chip(n, sel.name === n, function () {
+        sel.name = sel.name === n ? null : n;
+        renderQuiz();
+      }));
+    });
+
+    $('clearNamesBtn').hidden = quiz.names.length === 0;
+    if (!clearArmed) $('clearNamesBtn').textContent = '名前をリセット';
+    $('syncNote').textContent = sync.at
+      ? 'ルーレットと連動中（' + new Date(sync.at).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' に受信）'
+      : 'まだルーレットから何も届いていません。';
+    var groups = $('roundGroups');
+    groups.textContent = '';
+    var rounds = [];
+    var cur = sync.current.filter(Boolean);
+    if (cur.length) rounds.push({ no: sync.round, topics: cur, now: true });
+    for (var i = sync.past.length - 1; i >= 0; i--) {
+      var p = sync.past[i] || {};
+      rounds.push({ no: i + 1, topics: [p.a, p.b].filter(Boolean), now: false });
+    }
+    if (!rounds.length) {
+      var e = document.createElement('p');
+      e.className = 'empty';
+      e.textContent = 'ルーレットでお題が決まると、ここに組ごとに出ます。下の「すべてのお題」からも選べます。';
+      groups.appendChild(e);
+    }
+    rounds.forEach(function (r) {
+      var row = document.createElement('div');
+      row.className = 'round-group';
+      var nm = document.createElement('span');
+      nm.className = 'round-name' + (r.now ? ' now' : '');
+      nm.textContent = r.no + '組目';
+      row.appendChild(nm);
+      r.topics.forEach(function (t) { row.appendChild(topicChip(t)); });
+      groups.appendChild(row);
+    });
+
+    var all = $('allTopicChips');
+    all.textContent = '';
+    sync.topics.forEach(function (t) { all.appendChild(topicChip(t)); });
+    if (!rounds.length) $('allTopics').open = true;
+
+    var modes = $('modeChips');
+    modes.textContent = '';
+    MODES.forEach(function (m) {
+      modes.appendChild(chip(m[1], sel.mode === m[0], function () { sel.mode = m[0]; renderQuiz(); }));
+    });
+
+    genBtn.disabled = busy;
+    genBtn.textContent = busy ? '考え中…' : 'ハズレを3つつくる';
+    $('regenBtn').disabled = busy;
+
+    renderSaved();
+  }
+
+  function renderSaved() {
+    var list = $('savedList');
+    list.textContent = '';
+    $('savedEmpty').hidden = quiz.items.length > 0;
+    $('copyAllBtn').hidden = quiz.items.length === 0;
+    $('csvBtn').hidden = quiz.items.length === 0;
+    $('savedCount').textContent = quiz.items.length ? quiz.items.length + '問' : '';
+    quiz.items.forEach(function (it, idx) {
+      var li = document.createElement('li');
+      li.className = 'saved-item';
+      var head = document.createElement('div');
+      head.className = 'saved-head';
+      var no = document.createElement('span');
+      no.className = 'saved-no';
+      head.appendChild(no);
+      var del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'ghost quiet';
+      del.textContent = 'この問題を消す';
+      del.addEventListener('click', function () {
+        quiz.items.splice(idx, 1);
+        saveQuiz();
+        renderQuiz();
+      });
+      head.appendChild(del);
+      li.appendChild(head);
+      li.appendChild(copyCell('問題', it.q, ''));
+      var answers = document.createElement('div');
+      answers.className = 'answers';
+      answers.appendChild(copyCell('正解', it.c, 'ok'));
+      it.w.forEach(function (w) { answers.appendChild(copyCell('ハズレ', w, '')); });
+      li.appendChild(answers);
+      list.appendChild(li);
+    });
+  }
+
+  function copyCell(label, text, tagClass) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'copy-cell';
+    var tag = document.createElement('span');
+    tag.className = 'tag' + (tagClass ? ' ' + tagClass : '');
+    tag.textContent = label;
+    var txt = document.createElement('span');
+    txt.className = 'txt';
+    txt.textContent = text;
+    var hint = document.createElement('span');
+    hint.className = 'hint';
+    hint.textContent = 'コピー';
+    b.appendChild(tag);
+    b.appendChild(txt);
+    b.appendChild(hint);
+    b.addEventListener('click', function () { copyText(text, hint); });
+    return b;
+  }
+
+  function copyText(text, hintEl) {
+    function done(ok) {
+      if (!hintEl) return;
+      var before = hintEl.textContent;
+      hintEl.textContent = ok ? 'コピーしました' : 'コピーできません';
+      setTimeout(function () { hintEl.textContent = before; }, 1400);
+    }
+    function legacy() {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      ta.remove();
+      done(ok);
+    }
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { done(true); }, legacy);
+      } else legacy();
+    } catch (e) { legacy(); }
+  }
+
+  function questionText(name, topic) {
+    var n = name ? name + 'さん' : 'この人';
+    var tpl = QUESTIONS[topic] || ('{n}の「' + topic + '」は？');
+    return tpl.replace('{n}', n);
+  }
+
+  function norm(s) { return String(s).replace(/\s+/g, '').toLowerCase(); }
+  function clash(a, b) {
+    var x = norm(a), y = norm(b);
+    return !x || !y || x === y || x.indexOf(y) !== -1 || y.indexOf(x) !== -1;
+  }
+  function chars(s) { return Array.from(String(s)).length; }
+
+  function pickAutoMode() {
+    var r = Math.random();
+    return r < 0.3 ? 'hard' : (r < 0.7 ? 'mix' : 'easy');
+  }
+
+  // Wrong answers from the built-in lists: closest in length first, with a little shuffle.
+  function fromPool(topic, answer, mode, avoid) {
+    var pool = POOLS[topic] || { s: [], j: [] };
+    var jokes = pool.j.concat(GENERIC_JOKES);
+    var len = chars(answer);
+    var out = [];
+    function take(list, n, type) {
+      var ok = list.filter(function (t) {
+        if (clash(t, answer)) return false;
+        if (avoid.some(function (a) { return norm(a) === norm(t); })) return false;
+        return !out.some(function (o) { return clash(o.text, t); });
+      }).map(function (t) { return { t: t, score: Math.abs(chars(t) - len) + Math.random() * 2.5 }; });
+      ok.sort(function (a, b) { return a.score - b.score; });
+      ok.slice(0, n).forEach(function (o) { out.push({ text: o.t, type: type }); });
+    }
+    var nS = mode === 'hard' ? 3 : (mode === 'easy' ? 0 : (Math.random() < 0.5 ? 2 : 1));
+    take(pool.s, nS, 'similar');
+    take(jokes, 3 - out.length, 'joke');
+    if (out.length < 3) take(pool.s, 3 - out.length, 'similar');
+    if (out.length < 3) { avoid = []; take(jokes.concat(pool.s), 3 - out.length, 'joke'); }
+    return shuffle(out);
+  }
+
+  function shuffle(a) {
+    for (var i = a.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+
+  function askClaude(topic, answer, mode, avoid) {
+    var mix = {
+      hard: '3つとも「正解にありそうで紛らわしい答え」(similar) にする。',
+      easy: '3つとも「そんなわけないやろ！」と笑える、ありえない答え (joke) にする。',
+      mix: '「正解にありそうで紛らわしい答え」(similar) と「そんなわけないやろ！と笑えるありえない答え」(joke) を混ぜる。どちらも最低1つ入れる。'
+    }[mode];
+    var prompt = [
+      '日本語の4択早押しクイズで使う「ハズレの選択肢」を3つ作ってください。',
+      '場面：職場の新人歓迎の交流会。参加者の自己紹介の内容をクイズにします。',
+      '',
+      'お題：' + topic,
+      '正解：' + answer,
+      '',
+      '条件：',
+      '・正解と同じくらいの文字数（' + chars(answer) + '文字前後）、同じ言い回し・語尾にそろえる。',
+      '・正解と同じ意味、ほぼ同じ意味のものは入れない。3つは互いに違う内容にする。',
+      '・' + mix,
+      '・ネタは誰も傷つけない明るいものにする。下品なもの、特定の人や会社をからかうもの、病気・お金の事情・家庭の事情に触れるものは使わない。',
+      avoid.length ? '・次の選択肢は使わない：' + avoid.join(' / ') : '',
+      '',
+      '出力はJSONのみ。例：[{"text":"カフェめぐり","type":"similar"},{"text":"山で修行","type":"joke"},{"text":"家でゴロゴロ","type":"similar"}]'
+    ].filter(function (l) { return l !== ''; }).join('\n');
+
+    return sampleFn.json(prompt, { modelTier: 'quick', cache: false }).then(function (data) {
+      var list = Array.isArray(data) ? data : (data && Array.isArray(data.choices) ? data.choices : []);
+      var out = [];
+      list.forEach(function (c) {
+        var text = c && typeof c.text === 'string' ? c.text.trim() : '';
+        if (!text || clash(text, answer)) return;
+        if (out.some(function (o) { return norm(o.text) === norm(text); })) return;
+        out.push({ text: text, type: c.type === 'joke' ? 'joke' : 'similar' });
+      });
+      if (out.length < 3) throw { code: 'invalid_json' };
+      return out.slice(0, 3);
+    });
+  }
+
+  var HIDE_CODES = ['not_granted', 'sampling_disabled', 'not_declared', 'capability_disabled', 'capability_removed'];
+
+  function updateEngineNote() {
+    $('engineNote').textContent = (sampleFn
+      ? 'ハズレはClaudeが考えます（最初の1回だけ許可を聞かれます）。'
+      : 'ハズレは手持ちの候補から選びます。')
+      + '名前と作った問題は、この端末の中だけに保存されます。';
+  }
+
+  function generate(regen) {
+    if (busy) return;
+    var topic = regen && draft ? draft.topic : sel.topic;
+    var name = regen && draft ? draft.name : sel.name;
+    var answer = (regen && draft ? $('dC').value : answerInput.value).trim();
+    if (!topic) { genMsg.textContent = 'お題を選んでください。'; return; }
+    if (!answer) { genMsg.textContent = '正解を入力してください。'; answerInput.focus(); return; }
+    var mode = sel.mode === 'auto' ? pickAutoMode() : sel.mode;
+    var avoid = regen && draft ? dW.map(function (i) { return i.value.trim(); }).filter(Boolean) : [];
+
+    busy = true;
+    genMsg.textContent = '';
+    renderQuiz();
+
+    var note = '';
+    var ask = sampleFn
+      ? askClaude(topic, answer, mode, avoid).catch(function (e) {
+          var code = e && e.code;
+          if (HIDE_CODES.indexOf(code) !== -1) { sampleFn = null; updateEngineNote(); }
+          else note = 'Claudeにつながらなかったので、手持ちの候補から選びました。';
+          return null;
+        })
+      : Promise.resolve(null);
+
+    ask.then(function (list) {
+      if (!list) {
+        list = fromPool(topic, answer, mode, avoid);
+        if (!POOLS[topic]) note = 'このお題は手持ちの候補が少ないので、ハズレを手で直してください。';
+      }
+      draft = { name: name, topic: topic };
+      if (!regen) $('dQ').value = questionText(name, topic);
+      $('dC').value = answer;
+      for (var i = 0; i < 3; i++) {
+        var w = list[i] || { text: '', type: 'similar' };
+        dW[i].value = w.text;
+        dT[i].textContent = w.type === 'joke' ? 'ネタ' : '似てる';
+        dT[i].className = 'tag' + (w.type === 'joke' ? ' joke' : '');
+      }
+      $('draftEmpty').hidden = true;
+      $('draftBody').hidden = false;
+      busy = false;
+      genMsg.textContent = note;
+      renderQuiz();
+    });
+  }
+
+  function saveDraft() {
+    if (!draft) return;
+    var item = {
+      name: draft.name,
+      topic: draft.topic,
+      q: $('dQ').value.trim(),
+      c: $('dC').value.trim(),
+      w: dW.map(function (i) { return i.value.trim(); }),
+      pos: Math.floor(Math.random() * 4)   // where the correct answer sits among the four
+    };
+    if (!item.q || !item.c || item.w.some(function (w) { return !w; })) {
+      genMsg.textContent = '問題文・正解・ハズレ3つをすべて埋めてから保存してください。';
+      return;
+    }
+    quiz.items.push(item);
+    saveQuiz();
+    draft = null;
+    answerInput.value = '';
+    $('draftBody').hidden = true;
+    $('draftEmpty').hidden = false;
+    genMsg.textContent = '保存しました（' + quiz.items.length + '問目）。';
+    renderQuiz();
+    answerInput.focus();
+  }
+
+  // Blooket's official import template: row 1 is blank (logo), row 2 holds these headers,
+  // questions start on row 3. Columns A-H.
+  var BLOOKET_HEADER = ['Question #', 'Question Text', 'Answer 1', 'Answer 2', 'Answer 3 \n(Optional)',
+    'Answer 4 \n(Optional)', 'Time Limit (sec) \n(Max: 300 Seconds)', 'Correct Answer(s) \n(Only Include Answer #)'];
+  var TIME_LIMIT = 20;
+
+  // One template row per saved question: [#, question, answer 1-4, time limit, correct answer #].
+  function blooketRows() {
+    return quiz.items.map(function (it, i) {
+      var pos = (typeof it.pos === 'number' && it.pos >= 0 && it.pos <= 3) ? it.pos : i % 4;
+      var answers = it.w.slice(0, 3);
+      answers.splice(pos, 0, it.c);
+      return [i + 1, it.q].concat(answers, [TIME_LIMIT, pos + 1]);
+    });
+  }
+
+  function csvCell(v) {
+    v = String(v == null ? '' : v);
+    return /[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+  }
+
+  function blooketCsv() {
+    var rows = [['', '', '', '', '', '', '', ''], BLOOKET_HEADER].concat(blooketRows());
+    return rows.map(function (r) { return r.map(csvCell).join(','); }).join('\r\n') + '\r\n';
+  }
+
+  function saveCsv() {
+    var msg = $('csvMsg');
+    var name = 'blooket-quiz.csv';
+    var csv = blooketCsv();
+    if (downloadsCap) {
+      downloadsCap.save({ filename: name, data: csv }).then(function () {
+        msg.textContent = 'CSVを保存しました。Blooketの「Spreadsheet Import」でこのファイルを選んでください。';
+      }, function (e) {
+        msg.textContent = (e && e.code === 'declined')
+          ? '保存をやめました。'
+          : 'ここからは保存できませんでした。「テンプレート用にコピー」を使ってください。';
+      });
+      return;
+    }
+    try {
+      var url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+      msg.textContent = 'CSVを保存しました（ダウンロードフォルダを見てください）。';
+    } catch (e) {
+      msg.textContent = 'ここからは保存できませんでした。「テンプレート用にコピー」を使ってください。';
+    }
+  }
+
+  // Cells for columns B-H, ready to paste at B3 of the template (column A is already numbered there).
+  function copyAll() {
+    var tsv = blooketRows().map(function (r) {
+      return r.slice(1).map(function (c) { return String(c).replace(/[\t\r\n]+/g, ' '); }).join('\t');
+    }).join('\n');
+    var btn = $('copyAllBtn');
+    var before = btn.textContent;
+    copyText(tsv, btn);
+    setTimeout(function () { btn.textContent = before; }, 1500);
+  }
+
+  // =====================================================================
+  // Views and wiring
+  // =====================================================================
+  function setView(v) {
+    var quizMode = v === 'quiz';
+    $('viewRoulette').hidden = quizMode;
+    $('viewQuiz').hidden = !quizMode;
+    document.body.classList.toggle('mode-quiz', quizMode);
+    document.title = quizMode ? 'クイズづくり' : '自己紹介ルーレット';
+    if (quizMode) renderQuiz();
+    else { resize(); render(); }
+    window.scrollTo(0, 0);
+  }
+
+  mainBtn.addEventListener('click', primaryAction);
+  hubBtn.addEventListener('click', primaryAction);
+  canvas.addEventListener('click', function () { if (state.slots.indexOf(null) !== -1) spin(); });
+  $('resetBtn').addEventListener('click', function () { resetGame(); });
+  soundBtn.addEventListener('click', function () { state.sound = !state.sound; save(false); render(); });
+
+  var input = $('topicsInput');
+  var editMsg = $('editMsg');
+  $('applyBtn').addEventListener('click', function () {
+    var seen = {};
+    var lines = input.value.split(/\r?\n/).map(function (s) { return s.trim(); })
+      .filter(function (s) { if (!s || seen[s]) return false; seen[s] = true; return true; });
+    if (lines.length < 2) { editMsg.textContent = 'お題は2つ以上書いてください。'; return; }
+    resetGame(lines);
+    input.value = state.topics.join('\n');
+    editMsg.textContent = lines.length + '個のお題をセットしました。';
+  });
+  $('defaultBtn').addEventListener('click', function () {
+    resetGame(DEFAULT_LABELS.slice());
+    input.value = state.topics.join('\n');
+    editMsg.textContent = 'おすすめ20個に戻しました。';
+  });
+
+  $('nameForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var box = $('nameInput');
+    var n = box.value.trim().replace(/さん$/, '');
+    if (!n) return;
+    if (quiz.names.indexOf(n) === -1) quiz.names.push(n);
+    sel.name = n;
+    box.value = '';
+    saveQuiz();
+    renderQuiz();
+  });
+  // Two presses, because the viewer shows no confirm() dialog.
+  var clearArmed = false;
+  var clearTimer = null;
+  $('clearNamesBtn').addEventListener('click', function () {
+    var btn = $('clearNamesBtn');
+    clearTimeout(clearTimer);
+    if (!clearArmed) {
+      clearArmed = true;
+      btn.textContent = '名前を全部消します。もう一度押すと消えます';
+      clearTimer = setTimeout(function () { clearArmed = false; renderQuiz(); }, 4000);
+      return;
+    }
+    clearArmed = false;
+    quiz.names = [];
+    sel.name = null;
+    saveQuiz();
+    renderQuiz();
+    genMsg.textContent = '名前をリセットしました。保存した問題はそのまま残っています。';
+  });
+  genBtn.addEventListener('click', function () { generate(false); });
+  answerInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); generate(false); }
+  });
+  $('regenBtn').addEventListener('click', function () { generate(true); });
+  $('saveBtn').addEventListener('click', saveDraft);
+  $('copyAllBtn').addEventListener('click', copyAll);
+  $('csvBtn').addEventListener('click', saveCsv);
+
+  // The wheel may be open in another tab of this browser.
+  var lastLocal = '';
+  function readLocal(raw) {
+    try {
+      if (raw === undefined) raw = localStorage.getItem(STORE_KEY);
+      if (!raw || raw === lastLocal) return;
+      lastLocal = raw;
+      var s = JSON.parse(raw);
+      applySync({
+        at: s.at,
+        round: s.round,
+        current: (s.slots || []).map(function (i) { return i === null ? '' : s.topics[i]; }),
+        past: (s.past || []).map(function (p) { return { a: p[0], b: p[1] }; }),
+        topics: s.topics
+      });
+    } catch (err) { /* ignore a half-written or unreadable value */ }
+  }
+  window.addEventListener('storage', function (e) {
+    if (e.key === STORE_KEY && e.newValue) readLocal(e.newValue);
+  });
+  if (channel) channel.onmessage = function (e) { applySync(e.data); };
+  // Storage events do not reach every kind of tab, so the quiz maker also re-reads the stored copy.
+  setInterval(function () { if (!$('viewQuiz').hidden) readLocal(); }, 1500);
+  window.addEventListener('focus', function () { readLocal(); });
+
+  function connect() {
+    if (!window.claude || !window.claude.use) return;
+    window.claude.use('sample').then(function (s) { sampleFn = s || null; updateEngineNote(); }, function () {});
+    window.claude.use('downloads').then(function (d) { downloadsCap = d || null; }, function () {});
+    window.claude.use('db').then(function (d) {
+      if (!d) return;
+      db = d;
+      db.doc('game/state').onSnapshot(function (snap) {
+        if (snap.exists) applySync(snap.data());
+      }, function () { /* the list of all topics still works */ });
+    }, function () {});
+  }
+
+  function start(data) {
+    load(data && data.topics ? data : null);
+    loadQuiz();
+    rebuildWheel();
+    applySync(progress());
+    input.value = state.topics.join('\n');
+    updateEngineNote();
+    if (window.ResizeObserver) new ResizeObserver(resize).observe(wrap);
+    else window.addEventListener('resize', resize);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(draw);
+    if (window.matchMedia) {
+      var mq = window.matchMedia('(prefers-color-scheme: dark)');
+      if (mq.addEventListener) mq.addEventListener('change', draw);
+    }
+    // The quiz maker has no button on the wheel screen: it opens in its own tab at #quiz.
+    setView(location.hash === '#quiz' ? 'quiz' : 'roulette');
+    window.addEventListener('hashchange', function () {
+      setView(location.hash === '#quiz' ? 'quiz' : 'roulette');
+    });
+    connect();
+  }
+
+  var hot = window.claude && window.claude.hot;
+  if (hot && hot.snapshot) hot.snapshot(function () { return state; });
+  if (hot && hot.ready) hot.ready(start);
+  else start(hot && hot.data ? hot.data : null);
+})();
+</script>
