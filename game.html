@@ -1,0 +1,1196 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>交流会クイズ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&family=Zen+Maru+Gothic:wght@500;700;900&display=swap">
+<script src="https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<style>
+  /* Layout: TV game show on the company palette (pink / soft pink / gray / white).
+     Pink is only used for surfaces, big numbers and borders, never small text.
+     The four answer colors are the one exception, so choices read at a glance. */
+  :root {
+    --pink: #e3aaaa;
+    --pink-soft: #f4dede;
+    --pink-wash: #fbf2f2;
+    --white: #ffffff;
+    --ink: #3c3a39;
+    --gray: #77716f;
+    --line: #e6dddc;
+    --ans-1: #3e9e52;  /* green */
+    --ans-2: #e05a4f;  /* red */
+    --ans-3: #3a7bd5;  /* blue */
+    --ans-4: #f2c230;  /* yellow */
+    --ans-ink-4: #3c3a39;
+    --shadow: 0 6px 0 rgba(60, 58, 57, 0.18);
+    --font-display: "Mochiy Pop One", "Hiragino Maru Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
+    --font-body: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
+    --radius: 22px;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--pink-wash);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-weight: 700;
+    font-size: 16px;
+    line-height: 1.5;
+  }
+  button { font: inherit; cursor: pointer; }
+  :focus-visible { outline: 4px solid var(--ans-3); outline-offset: 3px; }
+
+  .screen {
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: clamp(16px, 2.4vw, 32px);
+    padding-inline: clamp(16px, 3vw, 48px);
+    padding-block: clamp(16px, 2.4vw, 36px);
+  }
+  .center { align-items: center; justify-content: center; text-align: center; }
+
+  .eyebrow { font-weight: 900; letter-spacing: 0.16em; color: var(--gray); font-size: clamp(0.85rem, 0.7rem + 0.4vw, 1.1rem); }
+  h1, h2 { margin: 0; font-family: var(--font-display); font-weight: 400; line-height: 1.25; text-wrap: balance; }
+  h1 { font-size: clamp(2rem, 1.2rem + 3.6vw, 4.4rem); }
+  h2 { font-size: clamp(1.4rem, 1rem + 2vw, 2.8rem); }
+  .ribbon {
+    display: inline-block;
+    padding: 0.1em 0.5em;
+    border-radius: 14px;
+    background: var(--pink);
+  }
+  .muted { color: var(--gray); }
+  .msg { margin: 0; color: var(--gray); min-height: 1.5em; }
+
+  .btn {
+    min-height: 56px;
+    padding: 12px 28px;
+    border-radius: 999px;
+    border: 3px solid var(--ink);
+    background: var(--white);
+    color: var(--ink);
+    font-weight: 900;
+    font-size: clamp(1rem, 0.9rem + 0.5vw, 1.3rem);
+    box-shadow: 0 5px 0 var(--ink);
+    transition: transform 150ms ease-out, box-shadow 150ms ease-out;
+  }
+  .btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 7px 0 var(--ink); }
+  .btn:active:not(:disabled) { transform: translateY(4px); box-shadow: 0 1px 0 var(--ink); }
+  .btn:disabled { opacity: 0.45; cursor: default; }
+  .btn.main { background: var(--pink); font-family: var(--font-display); font-weight: 400; font-size: clamp(1.15rem, 0.9rem + 1vw, 1.8rem); min-height: 68px; padding-inline: 40px; }
+  .btn.small { min-height: 44px; padding: 6px 18px; font-size: 0.95rem; box-shadow: 0 3px 0 var(--ink); }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: center; }
+
+  .card {
+    background: var(--white);
+    border: 3px solid var(--line);
+    border-radius: var(--radius);
+    padding: clamp(16px, 2vw, 28px);
+  }
+  .chip {
+    min-height: 44px;
+    padding: 6px 18px;
+    border-radius: 999px;
+    border: 3px solid var(--line);
+    background: var(--white);
+    color: var(--ink);
+    font-weight: 900;
+  }
+  .chip[aria-pressed="true"] { border-color: var(--ink); background: var(--pink-soft); }
+
+  /* ---------- host: start ---------- */
+  .start-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; width: min(100%, 980px); text-align: left; }
+  @media (min-width: 860px) { .start-grid { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); } }
+  .field { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .field-title { font-weight: 900; font-size: 1.05rem; }
+  .q-preview { margin: 0; padding-left: 1.4em; color: var(--ink); display: flex; flex-direction: column; gap: 4px; }
+  .q-preview li { overflow-wrap: anywhere; }
+  .file-label { display: inline-flex; }
+  .file-label input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+
+  /* ---------- host: lobby ---------- */
+  .lobby { display: grid; grid-template-columns: minmax(0, 1fr); gap: clamp(16px, 2.4vw, 36px); flex: 1; }
+  @media (min-width: 900px) { .lobby { grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.4fr); } }
+  .join-card { display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
+  .qr {
+    width: min(100%, 38vh, 380px);
+    aspect-ratio: 1;
+    padding: 14px;
+    background: var(--white);
+    border: 6px solid var(--pink);
+    border-radius: var(--radius);
+  }
+  .qr svg { display: block; width: 100%; height: 100%; }
+  .code-label { color: var(--gray); }
+  .code {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 1.4rem + 2.6vw, 3.6rem);
+    letter-spacing: 0.12em;
+    line-height: 1.1;
+  }
+  .url { font-size: 0.85rem; color: var(--gray); overflow-wrap: anywhere; max-width: 100%; }
+  .players-card { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .players-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .count-big { font-family: var(--font-display); font-size: clamp(1.4rem, 1rem + 1.6vw, 2.4rem); font-variant-numeric: tabular-nums; }
+  .players { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  .player {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 18px;
+    background: var(--pink-wash);
+    border: 3px solid var(--pink);
+    min-width: 0;
+    animation: pop 380ms cubic-bezier(.2, 1.5, .4, 1);
+  }
+  .player .ava { font-size: 2rem; line-height: 1; }
+  .player .nm { min-width: 0; overflow-wrap: anywhere; font-size: 1.1rem; }
+  .empty-players { color: var(--gray); }
+  @keyframes pop { 0% { transform: scale(0.7); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+  /* ---------- host: question ---------- */
+  .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .qno {
+    font-family: var(--font-display);
+    font-size: clamp(1.2rem, 0.9rem + 1.2vw, 2rem);
+    font-variant-numeric: tabular-nums;
+  }
+  .qno b { font-weight: 400; display: inline-block; padding: 0 0.4em; border-radius: 12px; background: var(--pink); }
+  .answered { color: var(--gray); font-size: clamp(1rem, 0.8rem + 0.6vw, 1.4rem); font-variant-numeric: tabular-nums; }
+  .timer {
+    position: relative;
+    width: clamp(70px, 8vw, 120px);
+    aspect-ratio: 1;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: conic-gradient(var(--pink) calc(var(--p, 1) * 360deg), var(--line) 0);
+  }
+  .timer span {
+    width: 78%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: var(--white);
+    font-family: var(--font-display);
+    font-size: clamp(1.4rem, 1rem + 1.4vw, 2.6rem);
+    font-variant-numeric: tabular-nums;
+  }
+  .question {
+    margin: 0;
+    padding: clamp(18px, 2.4vw, 36px);
+    background: var(--white);
+    border-radius: var(--radius);
+    border: 3px solid var(--line);
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: clamp(1.5rem, 1rem + 2.4vw, 3.4rem);
+    line-height: 1.35;
+    text-align: center;
+    text-wrap: balance;
+    overflow-wrap: anywhere;
+  }
+  .answers { display: grid; grid-template-columns: minmax(0, 1fr); gap: clamp(10px, 1.4vw, 18px); flex: 1; }
+  @media (min-width: 700px) { .answers { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .ans {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: clamp(10px, 1.2vw, 20px);
+    min-height: clamp(70px, 12vh, 150px);
+    padding: clamp(12px, 1.6vw, 24px) clamp(16px, 2vw, 32px);
+    border-radius: var(--radius);
+    border: 0;
+    color: var(--white);
+    font-weight: 900;
+    font-size: clamp(1.2rem, 0.8rem + 1.8vw, 2.6rem);
+    line-height: 1.3;
+    text-align: left;
+    box-shadow: var(--shadow);
+    transition: opacity 250ms ease-out, transform 250ms ease-out;
+  }
+  .ans .shape { flex: none; width: clamp(28px, 3vw, 52px); height: clamp(28px, 3vw, 52px); }
+  .ans .shape path, .ans .shape rect, .ans .shape circle { fill: currentColor; }
+  .ans .txt { min-width: 0; overflow-wrap: anywhere; flex: 1; }
+  .ans .cnt {
+    flex: none;
+    min-width: 2.2em;
+    padding: 2px 12px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.92);
+    color: var(--ink);
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.75em;
+  }
+  .ans.a1 { background: var(--ans-1); }
+  .ans.a2 { background: var(--ans-2); }
+  .ans.a3 { background: var(--ans-3); }
+  .ans.a4 { background: var(--ans-4); color: var(--ans-ink-4); }
+  .ans.dim { opacity: 0.28; transform: scale(0.97); }
+  .ans.right { outline: 6px solid var(--ink); outline-offset: 4px; }
+  .ans .ok-mark {
+    position: absolute;
+    top: -14px;
+    right: -10px;
+    padding: 2px 14px;
+    border-radius: 999px;
+    background: var(--ink);
+    color: var(--white);
+    font-size: 0.6em;
+  }
+
+  /* ---------- host: leaderboard & podium ---------- */
+  .board { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; width: min(100%, 900px); }
+  .board li {
+    display: grid;
+    grid-template-columns: 3.2em auto minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 20px;
+    background: var(--white);
+    border: 3px solid var(--line);
+    border-radius: 20px;
+    font-size: clamp(1.1rem, 0.8rem + 1vw, 1.8rem);
+    animation: slide 420ms ease-out both;
+  }
+  .board li:nth-child(1) { border-color: var(--pink); background: var(--pink-soft); }
+  .board .rk { font-family: var(--font-display); font-variant-numeric: tabular-nums; }
+  .board .ava { font-size: 1.6em; line-height: 1; }
+  .board .nm { min-width: 0; overflow-wrap: anywhere; }
+  .board .sc { font-variant-numeric: tabular-nums; }
+  .board .gain { color: var(--gray); font-size: 0.75em; font-variant-numeric: tabular-nums; min-width: 4.5em; text-align: right; }
+  @keyframes slide { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+
+  .podium { display: flex; align-items: flex-end; justify-content: center; gap: clamp(10px, 2vw, 28px); width: min(100%, 900px); }
+  .stand { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 0; }
+  .stand .ava { font-size: clamp(2.4rem, 1.6rem + 3vw, 5rem); line-height: 1; }
+  .stand .nm { font-size: clamp(1rem, 0.8rem + 0.9vw, 1.6rem); overflow-wrap: anywhere; text-align: center; }
+  .stand .sc { color: var(--gray); font-variant-numeric: tabular-nums; }
+  .block {
+    width: 100%;
+    display: grid;
+    place-items: center;
+    border-radius: 18px 18px 0 0;
+    background: var(--pink);
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 1.4rem + 2.4vw, 4rem);
+    color: var(--ink);
+  }
+  .p1 .block { height: clamp(140px, 26vh, 260px); }
+  .p2 .block { height: clamp(100px, 18vh, 190px); background: var(--pink-soft); }
+  .p3 .block { height: clamp(70px, 12vh, 140px); background: var(--line); }
+
+  /* ---------- player (phone) ---------- */
+  .phone { max-width: 520px; margin-inline: auto; width: 100%; }
+  .text-input {
+    width: 100%;
+    min-height: 60px;
+    padding: 12px 16px;
+    border-radius: 16px;
+    border: 3px solid var(--line);
+    background: var(--white);
+    color: var(--ink);
+    font: inherit;
+    font-size: 1.3rem;
+    text-align: center;
+  }
+  .text-input:focus { border-color: var(--ink); outline: none; }
+  .avatars { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; width: 100%; }
+  .avatar-btn {
+    aspect-ratio: 1;
+    border-radius: 18px;
+    border: 3px solid var(--line);
+    background: var(--white);
+    font-size: clamp(2rem, 9vw, 2.8rem);
+    line-height: 1;
+  }
+  .avatar-btn[aria-pressed="true"] { border-color: var(--ink); background: var(--pink-soft); transform: scale(1.05); }
+  .me { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .me .ava { font-size: 4.5rem; line-height: 1; }
+  .me .nm { font-size: 1.4rem; }
+  .p-answers { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; width: 100%; flex: 1; }
+  .p-answers .ans { min-height: 84px; font-size: 1.25rem; }
+  .p-q { margin: 0; font-size: 1.1rem; text-align: center; overflow-wrap: anywhere; }
+  .result-big { font-family: var(--font-display); font-size: clamp(2.4rem, 12vw, 3.6rem); line-height: 1.2; }
+  .result-big.good { display: inline-block; padding: 0.1em 0.5em; border-radius: 20px; background: var(--pink); }
+  .stat { font-size: 1.3rem; font-variant-numeric: tabular-nums; }
+
+  #confetti { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .player, .board li { animation: none; }
+    .btn, .ans { transition: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ================= HOST ================= -->
+<section class="screen center" id="hStart" hidden>
+  <span class="eyebrow">交流会</span>
+  <h1><span class="ribbon">みんなでクイズ</span></h1>
+  <div class="start-grid">
+    <div class="card field">
+      <span class="field-title">出題する問題</span>
+      <div class="row" style="justify-content:flex-start" id="sourceChips"></div>
+      <p class="msg" id="sourceMsg"></p>
+      <ol class="q-preview" id="qPreview"></ol>
+    </div>
+    <div class="card field">
+      <span class="field-title">1問の制限時間</span>
+      <div class="row" style="justify-content:flex-start" id="limitChips"></div>
+      <span class="field-title">参加のしかた</span>
+      <p class="msg">「部屋をつくる」を押すとQRコードが出ます。参加する人はスマホで読みこむだけで、ログインはいりません。</p>
+    </div>
+  </div>
+  <button type="button" class="btn main" id="createBtn">部屋をつくる</button>
+  <p class="msg" id="createMsg" role="status"></p>
+  <button type="button" class="btn small" id="toCodeJoin">スマホで参加する人はこちら（コード入力）</button>
+</section>
+
+<section class="screen" id="hLobby" hidden>
+  <div class="topbar">
+    <div>
+      <span class="eyebrow">参加受付中</span>
+      <h2>スマホでQRコードを読みこんでね</h2>
+    </div>
+    <button type="button" class="btn small" id="soundBtn" aria-pressed="true">音：オン</button>
+  </div>
+  <div class="lobby">
+    <div class="card join-card">
+      <div class="qr" id="qr" role="img" aria-label="参加用QRコード"></div>
+      <span class="code-label">参加コード</span>
+      <span class="code" id="codeText"></span>
+      <span class="url" id="urlText"></span>
+    </div>
+    <div class="card players-card">
+      <div class="players-head">
+        <span class="field-title">参加している人</span>
+        <span class="count-big" id="playerCount">0人</span>
+      </div>
+      <ul class="players" id="playerList"></ul>
+      <p class="empty-players" id="noPlayers">まだだれもいません。参加するとここに名前が出ます。</p>
+    </div>
+  </div>
+  <div class="row">
+    <button type="button" class="btn main" id="startBtn" disabled>クイズをはじめる</button>
+  </div>
+  <p class="msg" id="lobbyMsg" role="status" style="text-align:center"></p>
+</section>
+
+<section class="screen" id="hQuestion" hidden>
+  <div class="topbar">
+    <span class="qno" id="qNo"></span>
+    <span class="answered" id="answeredText"></span>
+    <div class="timer" id="timer"><span id="timerNum"></span></div>
+  </div>
+  <p class="question" id="qText"></p>
+  <div class="answers" id="hAnswers"></div>
+  <div class="row" id="revealRow" hidden>
+    <button type="button" class="btn main" id="toBoardBtn">ランキングを見る</button>
+  </div>
+  <div class="row" id="skipRow">
+    <button type="button" class="btn small" id="closeBtn">回答をしめきる</button>
+  </div>
+</section>
+
+<section class="screen center" id="hBoard" hidden>
+  <span class="eyebrow" id="boardEyebrow"></span>
+  <h2>いまのランキング</h2>
+  <ol class="board" id="boardList"></ol>
+  <button type="button" class="btn main" id="nextBtn">次の問題へ</button>
+</section>
+
+<section class="screen center" id="hEnd" hidden>
+  <span class="eyebrow">結果発表</span>
+  <h1><span class="ribbon">おつかれさまでした！</span></h1>
+  <div class="podium" id="podium"></div>
+  <ol class="board" id="restList"></ol>
+  <div class="row">
+    <button type="button" class="btn" id="againBtn">同じメンバーでもう一度</button>
+    <button type="button" class="btn" id="finishBtn">おわる</button>
+  </div>
+  <p class="msg" id="endMsg" role="status"></p>
+</section>
+
+<!-- ================= PLAYER ================= -->
+<section class="screen center phone" id="pCode" hidden>
+  <span class="eyebrow">交流会クイズ</span>
+  <h2>参加コードを入れてね</h2>
+  <input class="text-input" id="codeInput" type="text" inputmode="latin" autocomplete="off" maxlength="5" placeholder="例：AB3CD" aria-label="参加コード">
+  <button type="button" class="btn main" id="codeGoBtn">次へ</button>
+</section>
+
+<section class="screen center phone" id="pJoin" hidden>
+  <span class="eyebrow">交流会クイズ</span>
+  <h2>ニックネームを決めてね</h2>
+  <input class="text-input" id="nickInput" type="text" autocomplete="off" maxlength="10" placeholder="10文字まで" aria-label="ニックネーム">
+  <button type="button" class="btn main" id="joinBtn">参加する</button>
+  <p class="msg" id="joinMsg" role="status"></p>
+</section>
+
+<section class="screen center phone" id="pAvatar" hidden>
+  <span class="eyebrow" id="hiName"></span>
+  <h2>アイコンをえらんでね</h2>
+  <div class="avatars" id="avatarGrid"></div>
+  <button type="button" class="btn main" id="avatarBtn" disabled>これにする</button>
+</section>
+
+<section class="screen center phone" id="pWait" hidden>
+  <div class="me"><span class="ava" id="meAva"></span><span class="nm" id="meName"></span></div>
+  <h2 id="waitTitle">TVを見て待っててね</h2>
+  <p class="msg" id="waitMsg"></p>
+  <button type="button" class="btn small" id="changeAvatarBtn">アイコンを変える</button>
+</section>
+
+<section class="screen phone" id="pAnswer" hidden>
+  <span class="eyebrow" id="pQNo" style="text-align:center"></span>
+  <p class="p-q" id="pQText"></p>
+  <div class="p-answers" id="pAnswers"></div>
+</section>
+
+<section class="screen center phone" id="pResult" hidden>
+  <span class="result-big" id="resBig"></span>
+  <span class="stat" id="resGain"></span>
+  <span class="stat" id="resRank"></span>
+  <p class="msg">次の問題までTVを見て待っててね</p>
+</section>
+
+<section class="screen center phone" id="pEnd" hidden>
+  <div class="me"><span class="ava" id="endAva"></span><span class="nm" id="endName"></span></div>
+  <span class="result-big good" id="endRank"></span>
+  <span class="stat" id="endScore"></span>
+  <p class="msg">参加ありがとうございました！</p>
+</section>
+
+<section class="screen center phone" id="pError" hidden>
+  <h2>つながりませんでした</h2>
+  <p class="msg" id="errorMsg">通信が不安定かもしれません。Wi-Fiを切ってモバイル通信にするか、少し待ってから読みこみ直してください。</p>
+  <button type="button" class="btn main" id="retryBtn">読みこみ直す</button>
+</section>
+
+<canvas id="confetti" aria-hidden="true"></canvas>
+
+<script>
+(function () {
+  'use strict';
+
+  // Free public MQTT brokers over secure WebSocket. Nobody signs in; the first one that answers is used.
+  var BROKERS = ['wss://broker.emqx.io:8084/mqtt', 'wss://broker.hivemq.com:8884/mqtt'];
+  var TOPIC_ROOT = 'fidia-intro-quiz/v1/';
+  var QUIZ_KEY = 'intro-quiz-v1';      // written by the quiz maker on this same site
+  var HOST_KEY = 'intro-quiz-host-v1';
+  var AVATARS = ['🐶', '🐱', '🐰', '🐻', '🐼', '🐨', '🐯', '🦁', '🐸', '🐵', '🐧', '🐥', '🦊', '🐹', '🐮', '🐷'];
+  var LIMITS = [10, 20, 30];
+  var CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  var SHAPES = [
+    '<svg class="shape" viewBox="0 0 40 40" aria-hidden="true"><path d="M20 4 37 34H3z"/></svg>',
+    '<svg class="shape" viewBox="0 0 40 40" aria-hidden="true"><path d="M20 2 38 20 20 38 2 20z"/></svg>',
+    '<svg class="shape" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="17"/></svg>',
+    '<svg class="shape" viewBox="0 0 40 40" aria-hidden="true"><rect x="4" y="4" width="32" height="32" rx="3"/></svg>'
+  ];
+  var SAMPLE = [
+    { q: '【サンプル】日本でいちばん高い山は？', a: ['富士山', '北岳', '奥穂高岳', '槍ヶ岳'], correct: 0 },
+    { q: '【サンプル】1年でいちばん昼が長い日は？', a: ['春分', '夏至', '秋分', '冬至'], correct: 1 },
+    { q: '【サンプル】おにぎりの具で「おかか」の正体は？', a: ['鮭', '昆布', 'かつおぶし', '梅'], correct: 2 }
+  ];
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function $(id) { return document.getElementById(id); }
+  function show(id) {
+    document.querySelectorAll('.screen').forEach(function (s) { s.hidden = s.id !== id; });
+    window.scrollTo(0, 0);
+  }
+  function rand(n) {
+    var s = '';
+    for (var i = 0; i < n; i++) s += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+    return s;
+  }
+  function store(kind, key, val) {
+    try {
+      var s = kind === 'local' ? localStorage : sessionStorage;
+      if (val === undefined) return JSON.parse(s.getItem(key) || 'null');
+      if (val === null) s.removeItem(key); else s.setItem(key, JSON.stringify(val));
+    } catch (e) { return null; }
+    return null;
+  }
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+  function answerTile(i, text, tag) {
+    var b = document.createElement(tag || 'div');
+    b.className = 'ans a' + (i + 1);
+    b.innerHTML = SHAPES[i];
+    b.appendChild(el('span', 'txt', text));
+    return b;
+  }
+
+  // ---------- sound ----------
+  var soundOn = true;
+  var audio = null;
+  function beep(freq, dur, vol, when) {
+    if (!soundOn) return;
+    try {
+      if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
+      var t = audio.currentTime + (when || 0);
+      var o = audio.createOscillator();
+      var g = audio.createGain();
+      o.type = 'triangle';
+      o.frequency.value = freq;
+      g.gain.setValueAtTime(vol || 0.08, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(audio.destination);
+      o.start(t); o.stop(t + dur);
+    } catch (e) { /* sound is optional */ }
+  }
+  function chime() { [523, 659, 784, 1047].forEach(function (f, i) { beep(f, 0.24, 0.1, i * 0.1); }); }
+
+  // ---------- confetti ----------
+  function confetti() {
+    if (reduceMotion) return;
+    var c = $('confetti');
+    var ctx = c.getContext('2d');
+    var W = c.width = window.innerWidth;
+    var H = c.height = window.innerHeight;
+    var colors = ['#e3aaaa', '#3e9e52', '#e05a4f', '#3a7bd5', '#f2c230', '#ffffff'];
+    var bits = [];
+    for (var i = 0; i < 180; i++) {
+      bits.push({ x: Math.random() * W, y: -20 - Math.random() * H * 0.5, vx: (Math.random() - 0.5) * 3, vy: 2 + Math.random() * 4,
+        s: 7 + Math.random() * 8, r: Math.random() * 6, vr: (Math.random() - 0.5) * 0.3, c: colors[i % colors.length] });
+    }
+    var frames = 0;
+    (function step() {
+      ctx.clearRect(0, 0, W, H);
+      bits.forEach(function (p) {
+        p.x += p.vx; p.y += p.vy; p.r += p.vr;
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.r);
+        ctx.fillStyle = p.c; ctx.fillRect(-p.s / 2, -p.s / 3, p.s, p.s * 0.66);
+        ctx.restore();
+      });
+      if (++frames < 360) requestAnimationFrame(step); else ctx.clearRect(0, 0, W, H);
+    })();
+  }
+
+  // ---------- connection ----------
+  function connect(startIdx, onReady, onFail) {
+    if (!window.mqtt) { onFail(); return; }
+    var tries = 0;
+    (function attempt() {
+      if (tries >= BROKERS.length) { onFail(); return; }
+      var idx = (startIdx + tries) % BROKERS.length;
+      var settled = false;
+      var client = window.mqtt.connect(BROKERS[idx], {
+        clientId: 'fq_' + rand(10), clean: true, keepalive: 30, connectTimeout: 7000, reconnectPeriod: 0
+      });
+      function next() {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        try { client.end(true); } catch (e) { /* already closed */ }
+        tries++;
+        attempt();
+      }
+      var timer = setTimeout(next, 8000);
+      client.once('error', next);
+      client.once('connect', function () {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        client.options.reconnectPeriod = 2000;   // keep the line once it works
+        onReady(client, idx);
+      });
+    })();
+  }
+  function send(client, topic, obj, retain) {
+    try { client.publish(topic, obj === null ? '' : JSON.stringify(obj), { qos: 1, retain: !!retain }); } catch (e) { /* reconnect will follow */ }
+  }
+  function parse(payload) {
+    if (!payload || !payload.length) return null;
+    try { return JSON.parse(payload.toString()); } catch (e) { return null; }
+  }
+
+  // =====================================================================
+  // HOST (the TV)
+  // =====================================================================
+  var H = {
+    client: null, broker: 0, room: '', limit: 20, source: 'maker',
+    questions: [], players: {}, order: [], qi: -1, phase: 'start',
+    answers: {}, startedAt: 0, timerId: null, gains: {}
+  };
+
+  function makerQuestions() {
+    var quiz = store('local', QUIZ_KEY);
+    if (!quiz || !Array.isArray(quiz.items)) return [];
+    return quiz.items.filter(function (it) { return it && it.q && it.c && Array.isArray(it.w); }).map(function (it, i) {
+      var pos = (typeof it.pos === 'number' && it.pos >= 0 && it.pos <= 3) ? it.pos : i % 4;
+      var a = it.w.slice(0, 3).filter(Boolean);
+      pos = Math.min(pos, a.length);
+      a.splice(pos, 0, it.c);
+      return { q: it.q, a: a, correct: pos };
+    });
+  }
+
+  function parseCsv(text) {
+    var rows = [], row = [], cell = '', q = false;
+    for (var i = 0; i < text.length; i++) {
+      var ch = text[i];
+      if (q) {
+        if (ch === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; }
+        else cell += ch;
+      } else if (ch === '"') q = true;
+      else if (ch === ',') { row.push(cell); cell = ''; }
+      else if (ch === '\n' || ch === '\r') {
+        if (ch === '\r' && text[i + 1] === '\n') i++;
+        row.push(cell); rows.push(row); row = []; cell = '';
+      } else cell += ch;
+    }
+    if (cell || row.length) { row.push(cell); rows.push(row); }
+    // Blooket template: row 1 blank, row 2 headers, questions from row 3 (B = question, C-F = answers, H = correct #).
+    var out = [];
+    rows.slice(2).forEach(function (r) {
+      var qt = (r[1] || '').trim();
+      var answers = [r[2], r[3], r[4], r[5]].map(function (x) { return (x || '').trim(); });
+      var correctNo = parseInt(String(r[7] || '').split(',')[0], 10);
+      if (!qt || !answers[correctNo - 1]) return;
+      var kept = [], correct = 0;
+      answers.forEach(function (a, i) { if (a) { if (i === correctNo - 1) correct = kept.length; kept.push(a); } });
+      if (kept.length >= 2) out.push({ q: qt, a: kept, correct: correct });
+    });
+    return out;
+  }
+
+  var csvQuestions = [];
+
+  function renderStart() {
+    var maker = makerQuestions();
+    if (H.source === 'maker' && !maker.length) H.source = csvQuestions.length ? 'csv' : 'sample';
+    var chips = $('sourceChips');
+    chips.textContent = '';
+    function chip(key, label, disabled) {
+      var b = el('button', 'chip', label);
+      b.type = 'button';
+      b.disabled = !!disabled;
+      b.setAttribute('aria-pressed', String(H.source === key));
+      b.addEventListener('click', function () { H.source = key; renderStart(); });
+      chips.appendChild(b);
+    }
+    chip('maker', 'クイズづくりの問題（' + maker.length + '問）', !maker.length);
+    if (csvQuestions.length) chip('csv', 'CSVの問題（' + csvQuestions.length + '問）');
+    chip('sample', 'サンプル問題で試す（3問）');
+    var label = el('label', 'chip file-label', 'CSVファイルを読みこむ');
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.csv,text/csv';
+    input.addEventListener('change', function () {
+      var f = input.files && input.files[0];
+      if (!f) return;
+      var reader = new FileReader();
+      reader.onload = function () {
+        csvQuestions = parseCsv(String(reader.result || ''));
+        if (csvQuestions.length) { H.source = 'csv'; $('sourceMsg').textContent = ''; }
+        else $('sourceMsg').textContent = 'このファイルからは問題を読みこめませんでした。Blooket用に保存したCSVを選んでください。';
+        renderStart();
+      };
+      reader.readAsText(f, 'utf-8');
+    });
+    label.appendChild(input);
+    chips.appendChild(label);
+
+    H.questions = H.source === 'maker' ? maker : (H.source === 'csv' ? csvQuestions : SAMPLE);
+    var prev = $('qPreview');
+    prev.textContent = '';
+    H.questions.slice(0, 4).forEach(function (q) { prev.appendChild(el('li', '', q.q)); });
+    if (H.questions.length > 4) prev.appendChild(el('li', 'muted', 'ほか ' + (H.questions.length - 4) + '問'));
+    if (!maker.length && H.source !== 'csv') {
+      $('sourceMsg').textContent = 'このPCのクイズづくりに保存した問題はまだありません。';
+    }
+
+    var lc = $('limitChips');
+    lc.textContent = '';
+    LIMITS.forEach(function (s) {
+      var b = el('button', 'chip', s + '秒');
+      b.type = 'button';
+      b.setAttribute('aria-pressed', String(H.limit === s));
+      b.addEventListener('click', function () { H.limit = s; renderStart(); });
+      lc.appendChild(b);
+    });
+    $('createBtn').disabled = !H.questions.length;
+  }
+
+  function saveHost() {
+    store('session', HOST_KEY, {
+      broker: H.broker, room: H.room, limit: H.limit, questions: H.questions,
+      players: H.players, order: H.order, qi: H.qi, phase: H.phase
+    });
+  }
+
+  function topic(kind, id) { return TOPIC_ROOT + H.room + '/' + kind + (id ? '/' + id : ''); }
+
+  function hostConnect(room, brokerIdx, then) {
+    $('createMsg').textContent = 'つないでいます…';
+    $('createBtn').disabled = true;
+    connect(brokerIdx, function (client, idx) {
+      H.client = client;
+      H.broker = idx;
+      H.room = room;
+      client.subscribe([topic('p', '+'), topic('a', '+')], { qos: 1 });
+      client.on('message', onHostMessage);
+      client.on('offline', function () { $('lobbyMsg').textContent = '通信が切れました。つなぎ直しています…'; });
+      client.on('connect', function () { $('lobbyMsg').textContent = ''; });
+      $('createMsg').textContent = '';
+      then();
+    }, function () {
+      $('createBtn').disabled = false;
+      $('createMsg').textContent = 'つながりませんでした。ネットワークを確認して、もう一度押してください。会社のWi-Fiでだめなときは、スマホのテザリングで試してください。';
+    });
+  }
+
+  function joinUrl() {
+    var base = location.href.split('#')[0].split('?')[0];
+    return base + '?join=' + H.room + '&b=' + H.broker;
+  }
+
+  function renderQr() {
+    var url = joinUrl();
+    var qr = window.qrcode ? window.qrcode(0, 'M') : null;
+    if (qr) {
+      qr.addData(url);
+      qr.make();
+      $('qr').innerHTML = qr.createSvgTag({ cellSize: 8, margin: 0, scalable: true });
+    } else {
+      $('qr').textContent = 'QRコードを表示できませんでした。下のURLかコードで参加してください。';
+    }
+    $('codeText').textContent = H.room;
+    $('urlText').textContent = url;
+  }
+
+  function publishLobby() {
+    send(H.client, topic('s'), { t: 'lobby', n: H.order.length }, true);
+  }
+
+  function onHostMessage(t, payload) {
+    var parts = t.split('/');
+    var kind = parts[parts.length - 2];
+    var id = parts[parts.length - 1];
+    var msg = parse(payload);
+    if (!msg || !/^[A-Za-z0-9]{6,16}$/.test(id)) return;
+    if (kind === 'p') onHello(id, msg);
+    else if (kind === 'a') onAnswer(id, msg);
+  }
+
+  function onHello(id, msg) {
+    var name = String(msg.name || '').trim().slice(0, 10);
+    if (!name) return;
+    var avatar = (typeof msg.avatar === 'number' && msg.avatar >= 0 && msg.avatar < AVATARS.length) ? msg.avatar : -1;
+    var p = H.players[id];
+    if (!p) {
+      H.players[id] = { name: name, avatar: avatar, score: 0 };
+      H.order.push(id);
+      if (H.phase === 'lobby') beep(880, 0.12, 0.07);
+    } else {
+      p.name = name;
+      p.avatar = avatar;
+    }
+    saveHost();
+    if (H.phase === 'lobby') { renderLobby(); publishLobby(); }
+  }
+
+  function renderLobby() {
+    var list = $('playerList');
+    var known = {};
+    list.querySelectorAll('[data-id]').forEach(function (li) { known[li.dataset.id] = li; });
+    H.order.forEach(function (id) {
+      var p = H.players[id];
+      var li = known[id];
+      if (!li) {
+        li = el('li', 'player');
+        li.dataset.id = id;
+        li.appendChild(el('span', 'ava'));
+        li.appendChild(el('span', 'nm'));
+        list.appendChild(li);
+      }
+      li.querySelector('.ava').textContent = p.avatar >= 0 ? AVATARS[p.avatar] : '❔';
+      li.querySelector('.nm').textContent = p.name;
+    });
+    $('playerCount').textContent = H.order.length + '人';
+    $('noPlayers').hidden = H.order.length > 0;
+    $('startBtn').disabled = H.order.length === 0;
+  }
+
+  function openLobby() {
+    H.phase = 'lobby';
+    saveHost();
+    renderQr();
+    renderLobby();
+    publishLobby();
+    show('hLobby');
+  }
+
+  function askQuestion() {
+    var q = H.questions[H.qi];
+    H.phase = 'question';
+    H.answers = {};
+    H.startedAt = Date.now();
+    saveHost();
+    send(H.client, topic('s'), { t: 'q', n: H.qi, total: H.questions.length, text: q.q, a: q.a, limit: H.limit }, true);
+
+    $('qNo').innerHTML = '';
+    var b = el('b', '', 'Q' + (H.qi + 1));
+    $('qNo').appendChild(b);
+    $('qNo').appendChild(document.createTextNode(' / ' + H.questions.length));
+    $('qText').textContent = q.q;
+    var box = $('hAnswers');
+    box.textContent = '';
+    q.a.forEach(function (a, i) { box.appendChild(answerTile(i, a)); });
+    $('revealRow').hidden = true;
+    $('skipRow').hidden = false;
+    updateAnswered();
+    show('hQuestion');
+    beep(660, 0.15, 0.08);
+
+    clearInterval(H.timerId);
+    var lastSec = -1;
+    H.timerId = setInterval(function () {
+      var left = Math.max(0, H.limit * 1000 - (Date.now() - H.startedAt));
+      var sec = Math.ceil(left / 1000);
+      $('timerNum').textContent = sec;
+      $('timer').style.setProperty('--p', String(left / (H.limit * 1000)));
+      if (sec !== lastSec && sec <= 5 && sec > 0) beep(990, 0.06, 0.05);
+      lastSec = sec;
+      if (left <= 0) reveal();
+    }, 100);
+  }
+
+  function updateAnswered() {
+    var n = Object.keys(H.answers).length;
+    $('answeredText').textContent = n + ' / ' + H.order.length + '人が回答';
+  }
+
+  function onAnswer(id, msg) {
+    if (H.phase !== 'question' || msg.n !== H.qi || !H.players[id] || H.answers[id]) return;
+    var choice = msg.choice | 0;
+    if (choice < 0 || choice >= H.questions[H.qi].a.length) return;
+    H.answers[id] = { choice: choice, ms: Date.now() - H.startedAt };
+    updateAnswered();
+    if (Object.keys(H.answers).length >= H.order.length) setTimeout(reveal, 600);
+  }
+
+  function ranking() {
+    return H.order.slice().sort(function (a, b) { return H.players[b].score - H.players[a].score; });
+  }
+
+  function reveal() {
+    if (H.phase !== 'question') return;
+    clearInterval(H.timerId);
+    H.phase = 'reveal';
+    var q = H.questions[H.qi];
+    var counts = q.a.map(function () { return 0; });
+    var limitMs = H.limit * 1000;
+    H.gains = {};
+    H.order.forEach(function (id) {
+      var ans = H.answers[id];
+      var gain = 0;
+      if (ans) {
+        counts[ans.choice]++;
+        if (ans.choice === q.correct) gain = Math.round(1000 - 500 * Math.min(1, ans.ms / limitMs));
+      }
+      H.gains[id] = gain;
+      H.players[id].score += gain;
+    });
+    var ranked = ranking();
+    var results = {};
+    ranked.forEach(function (id, i) {
+      results[id] = { ok: !!(H.answers[id] && H.answers[id].choice === q.correct), answered: !!H.answers[id],
+        gain: H.gains[id], score: H.players[id].score, rank: i + 1 };
+    });
+    send(H.client, topic('s'), { t: 'reveal', n: H.qi, total: H.questions.length, correct: q.correct, results: results, players: H.order.length }, true);
+    saveHost();
+
+    var tiles = $('hAnswers').children;
+    for (var i = 0; i < tiles.length; i++) {
+      var tile = tiles[i];
+      tile.classList.toggle('dim', i !== q.correct);
+      tile.classList.toggle('right', i === q.correct);
+      tile.appendChild(el('span', 'cnt', counts[i] + '人'));
+      if (i === q.correct) tile.appendChild(el('span', 'ok-mark', '正解'));
+    }
+    $('timerNum').textContent = '0';
+    $('timer').style.setProperty('--p', '0');
+    $('skipRow').hidden = true;
+    $('revealRow').hidden = false;
+    $('toBoardBtn').textContent = H.qi === H.questions.length - 1 ? '結果発表へ' : 'ランキングを見る';
+    chime();
+  }
+
+  function boardRow(id, i, withGain) {
+    var p = H.players[id];
+    var li = el('li');
+    li.style.animationDelay = (i * 80) + 'ms';
+    li.appendChild(el('span', 'rk', (i + 1) + '位'));
+    li.appendChild(el('span', 'ava', p.avatar >= 0 ? AVATARS[p.avatar] : '❔'));
+    li.appendChild(el('span', 'nm', p.name));
+    li.appendChild(el('span', 'sc', p.score + '点'));
+    li.appendChild(el('span', 'gain', withGain && H.gains[id] ? '+' + H.gains[id] : ''));
+    return li;
+  }
+
+  function showBoard() {
+    if (H.qi >= H.questions.length - 1) { showEnd(); return; }
+    H.phase = 'board';
+    saveHost();
+    var list = $('boardList');
+    list.textContent = '';
+    ranking().slice(0, 5).forEach(function (id, i) { list.appendChild(boardRow(id, i, true)); });
+    $('boardEyebrow').textContent = 'Q' + (H.qi + 1) + ' / ' + H.questions.length + ' が終わりました';
+    show('hBoard');
+  }
+
+  function showEnd() {
+    H.phase = 'end';
+    saveHost();
+    var ranked = ranking();
+    var results = {};
+    ranked.forEach(function (id, i) { results[id] = { score: H.players[id].score, rank: i + 1 }; });
+    send(H.client, topic('s'), { t: 'end', results: results, players: H.order.length }, true);
+
+    var pod = $('podium');
+    pod.textContent = '';
+    [1, 0, 2].forEach(function (i) {
+      var id = ranked[i];
+      if (!id) return;
+      var p = H.players[id];
+      var st = el('div', 'stand p' + (i + 1));
+      st.appendChild(el('span', 'ava', p.avatar >= 0 ? AVATARS[p.avatar] : '❔'));
+      st.appendChild(el('span', 'nm', p.name));
+      st.appendChild(el('span', 'sc', p.score + '点'));
+      st.appendChild(el('div', 'block', String(i + 1)));
+      pod.appendChild(st);
+    });
+    var rest = $('restList');
+    rest.textContent = '';
+    ranked.slice(3, 10).forEach(function (id, i) { rest.appendChild(boardRow(id, i + 3, false)); });
+    show('hEnd');
+    chime();
+    confetti();
+  }
+
+  function clearRoom() {
+    if (!H.client) return;
+    send(H.client, topic('s'), null, true);
+    H.order.forEach(function (id) { send(H.client, topic('p', id), null, true); });
+  }
+
+  function startHost() {
+    var saved = store('session', HOST_KEY);
+    if (saved && saved.room && saved.phase && saved.phase !== 'start' && saved.phase !== 'end') {
+      // The TV page was reloaded mid-game: rejoin the same room and pick up at a safe point.
+      H.limit = saved.limit; H.questions = saved.questions || []; H.players = saved.players || {};
+      H.order = saved.order || []; H.qi = saved.qi;
+      hostConnect(saved.room, saved.broker | 0, function () {
+        if (saved.phase === 'lobby' || H.qi < 0) openLobby();
+        else { if (saved.phase === 'question') H.qi = Math.max(-1, H.qi - 1); showBoardOrLobby(); }
+      });
+      return;
+    }
+    renderStart();
+    show('hStart');
+  }
+  function showBoardOrLobby() {
+    if (H.qi < 0) { openLobby(); return; }
+    H.qi = Math.min(H.qi, H.questions.length - 1);
+    if (H.qi >= H.questions.length - 1) showEnd(); else showBoard();
+  }
+
+  $('createBtn').addEventListener('click', function () {
+    if (!H.questions.length) return;
+    H.players = {}; H.order = []; H.qi = -1;
+    hostConnect(rand(5), 0, openLobby);
+  });
+  $('startBtn').addEventListener('click', function () { H.qi = 0; askQuestion(); });
+  $('closeBtn').addEventListener('click', reveal);
+  $('toBoardBtn').addEventListener('click', showBoard);
+  $('nextBtn').addEventListener('click', function () { H.qi++; askQuestion(); });
+  $('againBtn').addEventListener('click', function () {
+    H.order.forEach(function (id) { H.players[id].score = 0; });
+    H.qi = -1;
+    openLobby();
+  });
+  $('finishBtn').addEventListener('click', function () {
+    clearRoom();
+    store('session', HOST_KEY, null);
+    $('endMsg').textContent = 'おわりました。このタブは閉じて大丈夫です。';
+    setTimeout(function () { try { H.client.end(); } catch (e) { /* closed */ } }, 1500);
+  });
+  $('soundBtn').addEventListener('click', function () {
+    soundOn = !soundOn;
+    $('soundBtn').textContent = '音：' + (soundOn ? 'オン' : 'オフ');
+    $('soundBtn').setAttribute('aria-pressed', String(soundOn));
+  });
+  $('toCodeJoin').addEventListener('click', function () { show('pCode'); $('codeInput').focus(); });
+  $('codeGoBtn').addEventListener('click', function () {
+    var code = $('codeInput').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (code.length !== 5) return;
+    location.href = location.href.split('#')[0].split('?')[0] + '?join=' + code;
+  });
+  window.addEventListener('storage', function (e) { if (e.key === QUIZ_KEY && H.phase === 'start') renderStart(); });
+  window.addEventListener('focus', function () { if (H.phase === 'start') renderStart(); });
+
+  // =====================================================================
+  // PLAYER (a phone)
+  // =====================================================================
+  var P = { client: null, room: '', id: '', name: '', avatar: -1, answeredN: -1, last: null, picking: -1 };
+
+  function pTopic(kind, id) { return TOPIC_ROOT + P.room + '/' + kind + (id ? '/' + id : ''); }
+
+  function hello() { send(P.client, pTopic('p', P.id), { name: P.name, avatar: P.avatar }, true); }
+
+  function renderAvatarGrid() {
+    var grid = $('avatarGrid');
+    grid.textContent = '';
+    AVATARS.forEach(function (a, i) {
+      var b = el('button', 'avatar-btn', a);
+      b.type = 'button';
+      b.setAttribute('aria-label', 'アイコン' + (i + 1));
+      b.setAttribute('aria-pressed', String(P.picking === i));
+      b.addEventListener('click', function () { P.picking = i; renderAvatarGrid(); $('avatarBtn').disabled = false; });
+      grid.appendChild(b);
+    });
+  }
+
+  function saveMe() { store('local', 'intro-quiz-me-' + P.room, { id: P.id, name: P.name, avatar: P.avatar }); }
+
+  function onState(msg) {
+    P.last = msg;
+    if (!P.name) return;                  // still choosing a nickname
+    if (!$('pAvatar').hidden) return;     // let them finish picking an icon
+    if (!msg) { waitScreen('TVを見て待っててね', ''); return; }
+    if (msg.t === 'lobby') waitScreen('TVを見て待っててね', 'まもなくはじまります（いま' + msg.n + '人）');
+    else if (msg.t === 'q') {
+      if (P.answeredN === msg.n) { waitScreen('回答しました！', 'みんなの回答を待っています'); return; }
+      $('pQNo').textContent = 'Q' + (msg.n + 1) + ' / ' + msg.total;
+      $('pQText').textContent = msg.text;
+      var box = $('pAnswers');
+      box.textContent = '';
+      msg.a.forEach(function (a, i) {
+        var b = answerTile(i, a, 'button');
+        b.type = 'button';
+        b.addEventListener('click', function () {
+          P.answeredN = msg.n;
+          send(P.client, pTopic('a', P.id), { n: msg.n, choice: i }, false);
+          waitScreen('回答しました！', 'みんなの回答を待っています');
+        });
+        box.appendChild(b);
+      });
+      show('pAnswer');
+    } else if (msg.t === 'reveal') {
+      var r = msg.results && msg.results[P.id];
+      if (!r) { waitScreen('次の問題から参加できます', ''); return; }
+      $('resBig').textContent = r.ok ? '正解！' : (r.answered ? 'ざんねん…' : '時間切れ');
+      $('resBig').className = 'result-big' + (r.ok ? ' good' : '');
+      $('resGain').textContent = r.ok ? '+' + r.gain + '点' : '';
+      $('resRank').textContent = 'いま ' + r.rank + '位（' + r.score + '点）';
+      if (r.ok) { beep(784, 0.15, 0.07); beep(1047, 0.2, 0.07, 0.12); }
+      show('pResult');
+    } else if (msg.t === 'end') {
+      var e = msg.results && msg.results[P.id];
+      $('endAva').textContent = P.avatar >= 0 ? AVATARS[P.avatar] : '❔';
+      $('endName').textContent = P.name;
+      $('endRank').textContent = e ? e.rank + '位！' : 'おつかれさま！';
+      $('endScore').textContent = e ? e.score + '点 / ' + msg.players + '人中' : '';
+      show('pEnd');
+      if (e && e.rank <= 3) confetti();
+    }
+  }
+
+  function waitScreen(title, sub) {
+    $('meAva').textContent = P.avatar >= 0 ? AVATARS[P.avatar] : '❔';
+    $('meName').textContent = P.name;
+    $('waitTitle').textContent = title;
+    $('waitMsg').textContent = sub;
+    $('changeAvatarBtn').hidden = !(P.last && P.last.t === 'lobby') && !!P.last;
+    show('pWait');
+  }
+
+  function startPlayer(room, brokerIdx) {
+    P.room = room;
+    var me = store('local', 'intro-quiz-me-' + room);
+    if (me && me.id) { P.id = me.id; P.name = me.name || ''; P.avatar = typeof me.avatar === 'number' ? me.avatar : -1; }
+    else P.id = rand(10);
+
+    show('pJoin');
+    $('joinMsg').textContent = 'つないでいます…';
+    $('joinBtn').disabled = true;
+    connect(brokerIdx, function (client) {
+      P.client = client;
+      client.subscribe(pTopic('s'), { qos: 1 });
+      client.on('message', function (t, payload) { onState(parse(payload)); });
+      client.on('connect', function () { if (P.name) hello(); });
+      $('joinMsg').textContent = '';
+      $('joinBtn').disabled = false;
+      if (P.name) {
+        hello();
+        if (P.avatar < 0) { P.picking = -1; renderAvatarGrid(); $('hiName').textContent = P.name + 'さん'; show('pAvatar'); }
+        else onState(P.last);
+      } else {
+        $('nickInput').focus();
+      }
+    }, function () { show('pError'); });
+  }
+
+  $('joinBtn').addEventListener('click', function () {
+    var name = $('nickInput').value.trim().slice(0, 10);
+    if (!name) { $('joinMsg').textContent = 'ニックネームを入れてください。'; return; }
+    P.name = name;
+    saveMe();
+    hello();
+    P.picking = P.avatar;
+    renderAvatarGrid();
+    $('avatarBtn').disabled = P.picking < 0;
+    $('hiName').textContent = name + 'さん、ようこそ！';
+    show('pAvatar');
+  });
+  $('nickInput').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); $('joinBtn').click(); }
+  });
+  $('avatarBtn').addEventListener('click', function () {
+    if (P.picking < 0) return;
+    P.avatar = P.picking;
+    saveMe();
+    hello();
+    $('pAvatar').hidden = true;
+    onState(P.last);
+  });
+  $('changeAvatarBtn').addEventListener('click', function () {
+    P.picking = P.avatar;
+    renderAvatarGrid();
+    $('hiName').textContent = P.name + 'さん';
+    show('pAvatar');
+  });
+  $('retryBtn').addEventListener('click', function () { location.reload(); });
+
+  // ---------- boot ----------
+  var params = new URLSearchParams(location.search);
+  var joinCode = (params.get('join') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (joinCode.length === 5) {
+    var b = parseInt(params.get('b'), 10);
+    startPlayer(joinCode, b >= 0 && b < BROKERS.length ? b : 0);
+  } else {
+    startHost();
+  }
+})();
+</script>
+</body>
+</html>
