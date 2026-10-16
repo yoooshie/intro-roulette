@@ -317,6 +317,19 @@
   .avatar-btn svg { display: block; width: 100%; height: 100%; }
   .ava { display: inline-block; flex: none; width: 1em; height: 1em; }
   .ava svg { display: block; width: 100%; height: 100%; }
+
+  /* Icon motion: blink everywhere; bob in the lobby and wait screen; hop when picked or on the podium. */
+  .ava svg, .avatar-btn svg { overflow: visible; }
+  .eye { transform-box: fill-box; transform-origin: center; animation: blink 5s infinite; animation-delay: var(--d, 0s); }
+  .player .ava svg, .me .ava svg { animation: bob 2.4s ease-in-out infinite; animation-delay: var(--d, 0s); }
+  .avatar-btn[aria-pressed="true"] svg, .stand .ava svg { animation: hop 0.9s ease-in-out infinite; }
+  .p1 .ava svg { animation-duration: 0.7s; }
+  @keyframes blink { 0%, 93%, 100% { transform: scaleY(1); } 96% { transform: scaleY(0.12); } }
+  @keyframes bob { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-6%) rotate(-5deg); } }
+  @keyframes hop { 0%, 100% { transform: translateY(0) scale(1, 1); } 15% { transform: translateY(0) scale(1.06, 0.94); } 45% { transform: translateY(-12%) scale(0.97, 1.03); } }
+  @media (prefers-reduced-motion: reduce) {
+    .eye, .player .ava svg, .me .ava svg, .avatar-btn[aria-pressed="true"] svg, .stand .ava svg { animation: none; }
+  }
   .avatar-btn[aria-pressed="true"] { border-color: var(--ink); background: var(--pink-soft); transform: scale(1.05); }
   .me { display: flex; flex-direction: column; align-items: center; gap: 6px; }
   .me .ava { font-size: 4.5rem; line-height: 1; }
@@ -542,8 +555,8 @@
     r = r || 4.5;
     return [-1, 1].map(function (side) {
       var x = 50 + side * dx;
-      return '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" fill="' + INK + '"/>' +
-        '<circle cx="' + (x + 1.4) + '" cy="' + (y - 1.6) + '" r="1.4" fill="#fff"/>';
+      return '<g class="eye"><circle cx="' + x + '" cy="' + y + '" r="' + r + '" fill="' + INK + '"/>' +
+        '<circle cx="' + (x + 1.4) + '" cy="' + (y - 1.6) + '" r="1.4" fill="#fff"/></g>';
     }).join('');
   }
   function cheeks(y, dx, color) {
@@ -935,6 +948,7 @@
       if (!li) {
         li = el('li', 'player');
         li.dataset.id = id;
+        li.style.setProperty('--d', (-Math.random() * 2.4).toFixed(2) + 's');   // so the icons don't bob in unison
         li.appendChild(el('span', 'ava'));
         li.appendChild(el('span', 'nm'));
         list.appendChild(li);
