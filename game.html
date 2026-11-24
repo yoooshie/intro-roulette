@@ -804,6 +804,31 @@
 
   var csvQuestions = [];
 
+  // Put the right answer in a different corner each time: every corner gets about the same share,
+  // never 3 in a row in the same place, and the wrong answers are shuffled too.
+  function shuffled(a) {
+    a = a.slice();
+    for (var i = a.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1)), t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+  function arrange(list) {
+    var bag = [], last = [-1, -1];
+    return list.map(function (q) {
+      var n = q.a.length;
+      if (n < 2) return q;
+      if (!bag.length) bag = shuffled(Array.apply(null, Array(n)).map(function (_, i) { return i; }));
+      var k = 0;
+      while (k < bag.length - 1 && bag[k] === last[0] && bag[k] === last[1]) k++;
+      var pos = Math.min(bag.splice(k, 1)[0], n - 1);
+      last = [last[1], pos];
+      var wrong = shuffled(q.a.filter(function (_, i) { return i !== q.correct; }));
+      wrong.splice(pos, 0, q.a[q.correct]);
+      return { q: q.q, a: wrong, correct: pos };
+    });
+  }
+
   function renderStart() {
     var maker = makerQuestions();
     if (H.source === 'maker' && !maker.length) H.source = csvQuestions.length ? 'csv' : 'sample';
@@ -839,7 +864,7 @@
     label.appendChild(input);
     chips.appendChild(label);
 
-    H.questions = H.source === 'maker' ? maker : (H.source === 'csv' ? csvQuestions : SAMPLE);
+    H.questions = arrange(H.source === 'maker' ? maker : (H.source === 'csv' ? csvQuestions : SAMPLE));
     var prev = $('qPreview');
     prev.textContent = '';
     H.questions.slice(0, 4).forEach(function (q) { prev.appendChild(el('li', '', q.q)); });
