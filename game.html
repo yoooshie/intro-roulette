@@ -365,6 +365,8 @@
     <div class="card field">
       <span class="field-title">1問の制限時間</span>
       <div class="row" style="justify-content:flex-start" id="limitChips"></div>
+      <span class="field-title">選択肢の並び</span>
+      <div class="row" style="justify-content:flex-start" id="orderChips"></div>
       <span class="field-title">参加のしかた</span>
       <p class="msg">「部屋をつくる」を押すとQRコードが出ます。参加する人はスマホで読みこむだけで、ログインはいりません。</p>
     </div>
@@ -761,6 +763,9 @@
     answers: {}, startedAt: 0, timerId: null, gains: {}
   };
 
+  var ORDER_KEY = 'intro-game-keep-order';
+  H.keepOrder = store('local', ORDER_KEY) === true;
+
   function makerQuestions() {
     var quiz = store('local', QUIZ_KEY);
     if (!quiz || !Array.isArray(quiz.items)) return [];
@@ -864,7 +869,8 @@
     label.appendChild(input);
     chips.appendChild(label);
 
-    H.questions = arrange(H.source === 'maker' ? maker : (H.source === 'csv' ? csvQuestions : SAMPLE));
+    var base = H.source === 'maker' ? maker : (H.source === 'csv' ? csvQuestions : SAMPLE);
+    H.questions = H.keepOrder ? base : arrange(base);
     var prev = $('qPreview');
     prev.textContent = '';
     H.questions.slice(0, 4).forEach(function (q) { prev.appendChild(el('li', '', q.q)); });
@@ -881,6 +887,15 @@
       b.setAttribute('aria-pressed', String(H.limit === s));
       b.addEventListener('click', function () { H.limit = s; renderStart(); });
       lc.appendChild(b);
+    });
+    var oc = $('orderChips');
+    oc.textContent = '';
+    [[false, '毎回シャッフル'], [true, 'クイズづくりの並びのまま']].forEach(function (o) {
+      var b = el('button', 'chip', o[1]);
+      b.type = 'button';
+      b.setAttribute('aria-pressed', String(H.keepOrder === o[0]));
+      b.addEventListener('click', function () { H.keepOrder = o[0]; store('local', ORDER_KEY, o[0]); renderStart(); });
+      oc.appendChild(b);
     });
     $('createBtn').disabled = !H.questions.length;
   }

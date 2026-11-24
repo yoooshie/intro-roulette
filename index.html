@@ -499,7 +499,7 @@
   .saved-no::before { content: "Q" counter(q); }
   .copy-cell {
     display: grid;
-    grid-template-columns: 4.2em minmax(0, 1fr) auto;
+    grid-template-columns: 5.6em minmax(0, 1fr) auto;
     align-items: center;
     gap: 8px;
     width: 100%;
@@ -670,7 +670,9 @@
       <span class="count" id="savedCount"></span>
       <button type="button" class="ghost" id="csvBtn">Blooket用のCSVを保存</button>
       <button type="button" class="ghost quiet" id="copyAllBtn">テンプレート用にコピー（B3に貼りつけ）</button>
+      <button type="button" class="ghost" id="shuffleAllBtn">全問の並びをシャッフル</button>
     </div>
+    <p class="msg" id="orderNote">①左上 ②右上 ③左下 ④右下 が、TVに出るときの並びです。ゲーム側で「クイズづくりの並びのまま」を選ぶと、この並びで出題されます。</p>
     <p class="msg" id="csvMsg" role="status"></p>
     <p class="empty" id="savedEmpty">まだありません。保存した問題は、Blooketのテンプレートと同じ並びのCSVにまとめて保存できます。文字をタップすれば1つずつコピーもできます。</p>
     <ol class="saved-list" id="savedList"></ol>
@@ -1302,6 +1304,8 @@
     $('savedEmpty').hidden = quiz.items.length > 0;
     $('copyAllBtn').hidden = quiz.items.length === 0;
     $('csvBtn').hidden = quiz.items.length === 0;
+    $('shuffleAllBtn').hidden = quiz.items.length === 0;
+    $('orderNote').hidden = quiz.items.length === 0;
     $('savedCount').textContent = quiz.items.length ? quiz.items.length + '問' : '';
     quiz.items.forEach(function (it, idx) {
       var li = document.createElement('li');
@@ -1320,16 +1324,66 @@
         saveQuiz();
         renderQuiz();
       });
-      head.appendChild(del);
+      var mix = document.createElement('button');
+      mix.type = 'button';
+      mix.className = 'ghost';
+      mix.textContent = '並びをシャッフル';
+      mix.addEventListener('click', function () {
+        shuffleItem(it, idx);
+        saveQuiz();
+        renderQuiz();
+      });
+      var btns = document.createElement('div');
+      btns.className = 'row';
+      btns.appendChild(mix);
+      btns.appendChild(del);
+      head.appendChild(btns);
       li.appendChild(head);
       li.appendChild(copyCell('問題', it.q, ''));
       var answers = document.createElement('div');
       answers.className = 'answers';
-      answers.appendChild(copyCell('正解', it.c, 'ok'));
-      it.w.forEach(function (w) { answers.appendChild(copyCell('ハズレ', w, '')); });
+      choiceOrder(it, idx).forEach(function (o, k) {
+        answers.appendChild(copyCell(MARKS[k] + (o.ok ? '正解' : 'ハズレ'), o.text, o.ok ? 'ok' : ''));
+      });
       li.appendChild(answers);
       list.appendChild(li);
     });
+  }
+
+  // The four choices in the order the TV shows them (same rule as the game and the CSV).
+  var MARKS = ['①', '②', '③', '④'];
+  function posOf(it, idx) {
+    return (typeof it.pos === 'number' && it.pos >= 0 && it.pos <= 3) ? it.pos : idx % 4;
+  }
+  function choiceOrder(it, idx) {
+    var out = it.w.slice(0, 3).map(function (w) { return { text: w, ok: false }; });
+    out.splice(Math.min(posOf(it, idx), out.length), 0, { text: it.c, ok: true });
+    return out;
+  }
+  function shuffledCopy(a) {
+    a = a.slice();
+    for (var i = a.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1)), t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+  // Move the right answer to a different place and mix the wrong ones.
+  function shuffleItem(it, idx) {
+    var cur = posOf(it, idx), next = cur;
+    while (next === cur) next = Math.floor(Math.random() * 4);
+    it.w = shuffledCopy(it.w);
+    it.pos = next;
+  }
+  function shuffleAll() {
+    var bag = [];
+    quiz.items.forEach(function (it, idx) {
+      if (!bag.length) bag = shuffledCopy([0, 1, 2, 3]);
+      it.w = shuffledCopy(it.w);
+      it.pos = bag.pop();
+    });
+    saveQuiz();
+    renderQuiz();
+    $('csvMsg').textContent = '全問の並びをシャッフルしました。';
   }
 
   function copyCell(label, text, tagClass) {
@@ -1685,6 +1739,7 @@
   $('saveBtn').addEventListener('click', saveDraft);
   $('copyAllBtn').addEventListener('click', copyAll);
   $('csvBtn').addEventListener('click', saveCsv);
+  $('shuffleAllBtn').addEventListener('click', shuffleAll);
 
   // The wheel may be open in another tab of this browser.
   var lastLocal = '';
